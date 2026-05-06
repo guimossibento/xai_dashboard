@@ -20,6 +20,9 @@ PCT_COLS = ["fat_100g", "saturated_fat_100g", "sugars_100g", "salt_100g", "fiber
 
 
 def build():
+    print(f"ML_OUTPUT_PATH: {ML_OUTPUT_PATH}")
+    print(f"DB_PATH: {DB_PATH}")
+    print(f"CSV exists: {(ML_OUTPUT_PATH / 'products_scored.csv').exists()}")
     df = pd.read_csv(
         ML_OUTPUT_PATH / "products_scored.csv",
         dtype={"code": str},

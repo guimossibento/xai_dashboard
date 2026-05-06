@@ -95,6 +95,11 @@ def get_db():
 @app.on_event("startup")
 async def startup():
     global similarity_vectors, similarity_norms
+    if not DB_PATH.exists():
+        print(f"products.db not found at {DB_PATH}, building...")
+        import subprocess
+        subprocess.run(["python", str(Path(__file__).resolve().parent / "build_db.py")], check=True)
+    print(f"DB exists: {DB_PATH.exists()}, size: {DB_PATH.stat().st_size / 1024 / 1024:.1f} MB")
     similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy").astype(np.float32)
     similarity_norms = np.linalg.norm(similarity_vectors, axis=1)
 
