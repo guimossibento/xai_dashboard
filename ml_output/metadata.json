@@ -1,0 +1,19 @@
+{
+  "total_products": 84645,
+  "health_score_mean": 50.0,
+  "eco_score_mean": 50.0,
+  "health_grade_dist": {
+    "e": 17080,
+    "d": 16802,
+    "c": 16947,
+    "b": 17087,
+    "a": 16729
+  },
+  "eco_grade_dist": {
+    "e": 16971,
+    "d": 16929,
+    "c": 16929,
+    "b": 16929,
+    "a": 16887
+  }
+}
