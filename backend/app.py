@@ -105,15 +105,37 @@ class StatsResponse(BaseModel):
     nutriscore_grade_distribution: Dict[str, int]
 
 
+USECOLS = [
+    "code", "product_name", "brands", "categories", "nutriscore_grade",
+    "nova_group", "health_score", "health_grade", "eco_score", "eco_grade",
+    "image_url", "energy_kcal_100g", "fat_100g", "saturated_fat_100g",
+    "carbohydrates_100g", "sugars_100g", "fiber_100g", "proteins_100g",
+    "salt_100g", "sodium_100g", "packaging", "origins", "labels",
+    "stores", "quantity", "ingredients_text",
+    "eco_packaging", "eco_processing", "eco_labels", "eco_origins",
+]
+
 def load_data():
     global df_products, df_attributions, similarity_vectors, feature_names
 
-    df_products = pd.read_csv(ML_OUTPUT_PATH / "products_scored.csv", dtype={"code": str}, low_memory=False)
+    df_products = pd.read_csv(
+        ML_OUTPUT_PATH / "products_scored.csv",
+        dtype={"code": str},
+        usecols=USECOLS,
+        low_memory=False,
+    )
     df_products["code"] = df_products["code"].astype(str)
+    for col in ["brands", "categories", "nutriscore_grade", "health_grade", "eco_grade", "packaging", "origins"]:
+        if col in df_products.columns:
+            df_products[col] = df_products[col].astype("category")
+    for col in df_products.select_dtypes("float64").columns:
+        df_products[col] = df_products[col].astype("float32")
 
     df_attributions = pd.read_csv(ML_OUTPUT_PATH / "feature_attributions.csv")
+    for col in df_attributions.select_dtypes("float64").columns:
+        df_attributions[col] = df_attributions[col].astype("float32")
 
-    similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy")
+    similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy").astype(np.float32)
 
     with open(ML_OUTPUT_PATH / "feature_names.json") as f:
         feature_names = json.load(f)
