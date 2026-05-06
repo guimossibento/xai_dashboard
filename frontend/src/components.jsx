@@ -141,6 +141,64 @@ export function EcoBars({ items }) {
   );
 }
 
+export function EcoBarsOverlay({ products, colors }) {
+  if (!products?.length) return null;
+  const dims = ['Packaging', 'Processing', 'Labels', 'Origin'];
+  const dimKeys = ['eco_packaging', 'eco_processing', 'eco_labels', 'eco_origins'];
+  const data = dims.map((dim, di) => {
+    const entry = { name: dim };
+    products.forEach((p, pi) => {
+      const raw = p.feature_attributions?.eco_breakdown?.find(b =>
+        b.label.includes(dim === 'Processing' ? 'Processing' : dim === 'Labels' ? 'labels' : dim)
+      );
+      entry[`p${pi}`] = raw ? Math.max(-40, Math.min(40, raw.value)) : 0;
+    });
+    return entry;
+  });
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+        <CartesianGrid horizontal={false} stroke={T.line} />
+        <XAxis type="number" domain={[-40, 40]} ticks={[-40, -20, 0, 20, 40]}
+          tick={{ fontSize: 10, fontFamily: T.mono, fill: T.muted }}
+          axisLine={{ stroke: T.line }} tickLine={{ stroke: '#666' }} />
+        <YAxis type="category" dataKey="name" width={80}
+          tick={{ fontSize: 11, fontFamily: T.sans, fill: T.text }}
+          axisLine={{ stroke: T.line }} tickLine={{ stroke: '#666' }} />
+        <ReferenceLine x={0} stroke={T.muted} />
+        <Tooltip
+          formatter={(v, name) => [`${v > 0 ? '+' : ''}${v}`, products[parseInt(name.slice(1))]?.product_name?.slice(0, 20) || name]}
+          contentStyle={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 6, fontFamily: T.mono, fontSize: 11 }} />
+        {products.map((_, i) => (
+          <Bar key={i} dataKey={`p${i}`} fill={colors[i]} fillOpacity={0.75} barSize={12} radius={2} />
+        ))}
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export function EcoFactorCard({ label, value, description }) {
+  const positive = value >= 0;
+  const icon = positive ? '●' : '●';
+  return (
+    <div style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: `1px solid ${T.line}` }}>
+      <div style={{ width: 28, height: 28, borderRadius: 6, background: positive ? `${T.eco}18` : '#E63E1118',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, color: positive ? T.eco : '#E63E11' }}>{icon}</span>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{label}</span>
+          <span style={{ fontFamily: T.mono, fontSize: 12, fontWeight: 700, color: positive ? T.eco : '#E63E11' }}>
+            {value > 0 ? '+' : ''}{value}
+          </span>
+        </div>
+        <p style={{ fontSize: 11, color: T.muted, margin: '3px 0 0', lineHeight: 1.4 }}>{description}</p>
+      </div>
+    </div>
+  );
+}
+
 export function ProductImage({ url, height = 100, rounded = 6, categories }) {
   const [err, setErr] = useState(false);
   if (!url || err) {

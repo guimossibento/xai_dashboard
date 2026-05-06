@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { NSBadge, RadarChart } from '../components';
+import { NSBadge, RadarChart, EcoBarsOverlay } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -114,8 +114,10 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
               { l: 'salt', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{(p.salt_100g || 0).toFixed(1)}g</span> },
               { l: 'fiber', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{(p.fiber_100g || 0).toFixed(1)}g</span> },
               { l: 'protein', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{(p.proteins_100g || 0).toFixed(1)}g</span> },
-              { l: 'NOVA', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{p.nova_group ? Math.round(p.nova_group) : '-'}</span> },
+              { l: 'NOVA', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: p.nova_group <= 2 ? T.eco : p.nova_group >= 4 ? '#E63E11' : T.text }}>{p.nova_group ? Math.round(p.nova_group) : '-'}</span> },
               { l: 'packaging', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{p.packaging || '-'}</span> },
+              { l: 'origin', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{p.origins || '-'}</span> },
+              { l: 'eco labels', render: p => <span style={{ fontFamily: T.mono, fontSize: 11, color: T.text, wordBreak: 'break-word' }}>{p.labels?.split(',').slice(0,2).join(', ') || '-'}</span> },
             ].map(row => (
               <div key={row.l} style={{ display: 'grid', gridTemplateColumns: `1fr repeat(${products.length}, 1fr)`, gap: 8,
                 padding: '8px 0', borderBottom: `1px solid ${T.line}`, alignItems: 'center' }}>
@@ -152,6 +154,24 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
+              <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+                Overlaid eco contributions
+              </div>
+              <EcoBarsOverlay products={products} colors={COLORS} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
+                {products.map((p, i) => (
+                  <div key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontFamily: T.mono, color: T.text }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[i], flexShrink: 0 }} />
+                    {p.product_name}
+                  </div>
+                ))}
+              </div>
+              <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '8px 0 0', lineHeight: 1.4 }}>
+                Positive = planet-friendly · Negative = higher impact
+              </p>
             </div>
 
             {summary() && (

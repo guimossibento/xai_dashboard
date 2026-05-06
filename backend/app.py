@@ -1,32 +1,14 @@
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-import pandas as pd
 import numpy as np
 import math
 import json
+import sqlite3
 from pathlib import Path
-from sklearn.metrics.pairwise import cosine_similarity
 
 app = FastAPI()
-
-
-def clean_val(v):
-    if v is None or (isinstance(v, float) and math.isnan(v)):
-        return None
-    if isinstance(v, (np.integer,)):
-        return int(v)
-    if isinstance(v, (np.floating,)):
-        return round(float(v), 2)
-    if isinstance(v, np.bool_):
-        return bool(v)
-    return v
-
-
-def clean_dict(d):
-    return {k: clean_val(v) if not isinstance(v, dict) else clean_dict(v) for k, v in d.items()}
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,12 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DB_PATH = Path(__file__).resolve().parent / "products.db"
 ML_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "ml_output"
 
-df_products = None
-df_attributions = None
 similarity_vectors = None
-feature_names = None
+similarity_norms = None
 
 
 class ProductResponse(BaseModel):
@@ -105,52 +86,22 @@ class StatsResponse(BaseModel):
     nutriscore_grade_distribution: Dict[str, int]
 
 
-USECOLS = [
-    "code", "product_name", "brands", "categories", "nutriscore_grade",
-    "nova_group", "health_score", "health_grade", "eco_score", "eco_grade",
-    "image_url", "energy_kcal_100g", "fat_100g", "saturated_fat_100g",
-    "carbohydrates_100g", "sugars_100g", "fiber_100g", "proteins_100g",
-    "salt_100g", "sodium_100g", "packaging", "origins", "labels",
-    "stores", "quantity", "ingredients_text",
-    "eco_packaging", "eco_processing", "eco_labels", "eco_origins",
-]
-
-def load_data():
-    global df_products, df_attributions, similarity_vectors, feature_names
-
-    df_products = pd.read_csv(
-        ML_OUTPUT_PATH / "products_scored.csv",
-        dtype={"code": str},
-        usecols=USECOLS,
-        low_memory=False,
-    )
-    df_products["code"] = df_products["code"].astype(str)
-    for col in ["brands", "categories", "nutriscore_grade", "health_grade", "eco_grade", "packaging", "origins"]:
-        if col in df_products.columns:
-            df_products[col] = df_products[col].astype("category")
-    for col in df_products.select_dtypes("float64").columns:
-        df_products[col] = df_products[col].astype("float32")
-
-    df_attributions = pd.read_csv(ML_OUTPUT_PATH / "feature_attributions.csv")
-    for col in df_attributions.select_dtypes("float64").columns:
-        df_attributions[col] = df_attributions[col].astype("float32")
-
-    similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy").astype(np.float32)
-
-    with open(ML_OUTPUT_PATH / "feature_names.json") as f:
-        feature_names = json.load(f)
+def get_db():
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 @app.on_event("startup")
 async def startup():
-    load_data()
+    global similarity_vectors, similarity_norms
+    similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy").astype(np.float32)
+    similarity_norms = np.linalg.norm(similarity_vectors, axis=1)
 
 
-def safe_str(v):
-    return str(v) if pd.notna(v) else None
-
-
-def safe_float(v):
+def sf(v):
+    if v is None:
+        return None
     try:
         f = float(v)
         return None if math.isnan(f) else round(f, 2)
@@ -159,82 +110,33 @@ def safe_float(v):
 
 
 def make_product(row, health_weight=0.5):
+    hs = row["health_score"] or 0
+    es = row["eco_score"] or 0
     return ProductResponse(
         code=str(row["code"]),
-        product_name=safe_str(row["product_name"]) or "",
-        brands=safe_str(row["brands"]),
-        categories=safe_str(row["categories"]),
-        nutriscore_grade=safe_str(row["nutriscore_grade"]),
-        nova_group=safe_float(row["nova_group"]),
-        health_score=safe_float(row["health_score"]),
-        health_grade=safe_str(row["health_grade"]),
-        eco_score=safe_float(row["eco_score"]),
-        eco_grade=safe_str(row["eco_grade"]),
-        combined_score=safe_float(health_weight * (row["health_score"] if pd.notna(row["health_score"]) else 0) + (1 - health_weight) * (row["eco_score"] if pd.notna(row["eco_score"]) else 0)),
-        image_url=safe_str(row["image_url"]),
+        product_name=row["product_name"] or "",
+        brands=row["brands"],
+        categories=row["categories"],
+        nutriscore_grade=row["nutriscore_grade"],
+        nova_group=sf(row["nova_group"]),
+        health_score=sf(row["health_score"]),
+        health_grade=row["health_grade"],
+        eco_score=sf(row["eco_score"]),
+        eco_grade=row["eco_grade"],
+        combined_score=sf(health_weight * hs + (1 - health_weight) * es),
+        image_url=row["image_url"],
     )
 
 
-def make_detail(row, row_idx):
-    p = make_product(row)
-    return ProductDetailResponse(
-        **p.model_dump(),
-        energy_kcal_100g=safe_float(row["energy_kcal_100g"]),
-        fat_100g=safe_float(row["fat_100g"]),
-        saturated_fat_100g=safe_float(row["saturated_fat_100g"]),
-        carbohydrates_100g=safe_float(row["carbohydrates_100g"]),
-        sugars_100g=safe_float(row["sugars_100g"]),
-        fiber_100g=safe_float(row["fiber_100g"]),
-        proteins_100g=safe_float(row["proteins_100g"]),
-        salt_100g=safe_float(row["salt_100g"]),
-        sodium_100g=safe_float(row["sodium_100g"]),
-        packaging=safe_str(row["packaging"]),
-        origins=safe_str(row["origins"]),
-        labels=safe_str(row["labels"]),
-        stores=safe_str(row["stores"]),
-        quantity=safe_str(row["quantity"]),
-        ingredients_text=safe_str(row["ingredients_text"]),
-        feature_attributions=clean_dict(get_feature_attributions(row_idx)),
-        explanation=generate_explanation(row),
-    )
-
-
-
-def normalize_combined_score(row, health_weight=0.5):
-    health = row["health_score"] if pd.notna(row["health_score"]) else 0
-    eco = row["eco_score"] if pd.notna(row["eco_score"]) else 0
-    return health_weight * health + (1 - health_weight) * eco
-
-
-nutrition_percentiles = None
-
-def precompute_percentiles():
-    global nutrition_percentiles
-    cols = ["fat_100g", "saturated_fat_100g", "sugars_100g", "salt_100g", "fiber_100g", "proteins_100g"]
-    nutrition_percentiles = {}
-    for c in cols:
-        nutrition_percentiles[c] = df_products[c].rank(pct=True).fillna(0.5).values
-
-
-def get_feature_attributions(row_idx):
-    if nutrition_percentiles is None:
-        precompute_percentiles()
-
+def get_feature_attributions(row):
     radar = {}
-    negative = {"fat_100g": "fat", "saturated_fat_100g": "saturated_fat", "sugars_100g": "sugars", "salt_100g": "salt"}
-    positive = {"fiber_100g": "fiber", "proteins_100g": "proteins"}
+    for col, label in [("fat_100g", "fat"), ("saturated_fat_100g", "saturated_fat"), ("sugars_100g", "sugars"), ("salt_100g", "salt")]:
+        radar[label] = round((1 - (row[f"pct_{col}"] or 0.5)) * 100, 1)
+    for col, label in [("fiber_100g", "fiber"), ("proteins_100g", "proteins")]:
+        radar[label] = round((row[f"pct_{col}"] or 0.5) * 100, 1)
 
-    for col, label in negative.items():
-        pct = nutrition_percentiles[col][row_idx]
-        radar[label] = round((1 - pct) * 100, 1)
-
-    for col, label in positive.items():
-        pct = nutrition_percentiles[col][row_idx]
-        radar[label] = round(pct * 100, 1)
-
-    row = df_products.iloc[row_idx]
     def eco_signed(col):
-        v = float(row.get(col, 0) or 0)
+        v = float(row[col] or 0)
         return round((v - 0.5) * 80, 1)
 
     eco_breakdown = [
@@ -244,30 +146,54 @@ def get_feature_attributions(row_idx):
         {"label": "Origin", "value": eco_signed("eco_origins")},
     ]
 
-    return {
-        "radar": radar,
-        "eco_breakdown": eco_breakdown,
-    }
+    return {"radar": radar, "eco_breakdown": eco_breakdown}
 
 
 def generate_explanation(row):
-    health_score = row["health_score"] if pd.notna(row["health_score"]) else 0
-    health_grade = row["health_grade"] if pd.notna(row["health_grade"]) else "N/A"
-    eco_score = row["eco_score"] if pd.notna(row["eco_score"]) else 0
-    eco_grade = row["eco_grade"] if pd.notna(row["eco_grade"]) else "N/A"
-
-    packaging = row["packaging"] if pd.notna(row["packaging"]) else "unknown"
+    hs = sf(row["health_score"]) or 0
+    hg = row["health_grade"] or "N/A"
+    es = sf(row["eco_score"]) or 0
+    eg = row["eco_grade"] or "N/A"
+    pkg = row["packaging"] or "unknown"
 
     try:
-        nova_int = int(float(row["nova_group"])) if pd.notna(row["nova_group"]) else 0
+        nova_int = int(float(row["nova_group"])) if row["nova_group"] else 0
     except (ValueError, TypeError):
         nova_int = 0
     nova_text = {1: "minimally processed", 2: "processed with added ingredients", 3: "processed foods", 4: "ultra-processed"}.get(nova_int, "unknown processing level")
 
-    explanation = f"This product received a Health Score of {health_score:.1f} (grade {health_grade}). "
-    explanation += f"Its Environmental Impact Score of {eco_score:.1f} (grade {eco_grade}) is driven by {nova_text} and {packaging} packaging."
+    return f"This product received a Health Score of {hs:.1f} (grade {hg}). Its Environmental Impact Score of {es:.1f} (grade {eg}) is driven by {nova_text} and {pkg} packaging."
 
-    return explanation
+
+def make_detail(row):
+    p = make_product(row)
+    return ProductDetailResponse(
+        **p.model_dump(),
+        energy_kcal_100g=sf(row["energy_kcal_100g"]),
+        fat_100g=sf(row["fat_100g"]),
+        saturated_fat_100g=sf(row["saturated_fat_100g"]),
+        carbohydrates_100g=sf(row["carbohydrates_100g"]),
+        sugars_100g=sf(row["sugars_100g"]),
+        fiber_100g=sf(row["fiber_100g"]),
+        proteins_100g=sf(row["proteins_100g"]),
+        salt_100g=sf(row["salt_100g"]),
+        sodium_100g=sf(row["sodium_100g"]),
+        packaging=row["packaging"],
+        origins=row["origins"],
+        labels=row["labels"],
+        stores=row["stores"],
+        quantity=row["quantity"],
+        ingredients_text=row["ingredients_text"],
+        feature_attributions=get_feature_attributions(row),
+        explanation=generate_explanation(row),
+    )
+
+
+def cosine_similarities(idx):
+    vec = similarity_vectors[idx].reshape(1, -1)
+    dots = (similarity_vectors @ vec.T).flatten()
+    norm = similarity_norms[idx]
+    return dots / (similarity_norms * norm + 1e-10)
 
 
 @app.get("/api/products", response_model=Dict[str, Any])
@@ -281,184 +207,165 @@ async def list_products(
     page: int = 1,
     page_size: int = 20,
 ):
-    filtered = df_products.copy()
+    conn = get_db()
+    conditions, params = [], []
 
     if q:
-        q_lower = q.lower()
-        filtered = filtered[
-            (filtered["product_name"].str.lower().str.contains(q_lower, na=False)) |
-            (filtered["brands"].str.lower().str.contains(q_lower, na=False))
-        ]
-
+        conditions.append("(LOWER(product_name) LIKE ? OR LOWER(brands) LIKE ?)")
+        params.extend([f"%{q.lower()}%", f"%{q.lower()}%"])
     if category:
-        filtered = filtered[filtered["categories"].str.contains(category, case=False, na=False)]
-
+        conditions.append("LOWER(categories) LIKE ?")
+        params.append(f"%{category.lower()}%")
     if nutri_grade:
-        filtered = filtered[filtered["nutriscore_grade"] == nutri_grade]
-
+        conditions.append("nutriscore_grade = ?")
+        params.append(nutri_grade)
     if eco_grade:
-        filtered = filtered[filtered["eco_grade"] == eco_grade]
+        conditions.append("eco_grade = ?")
+        params.append(eco_grade)
 
-    if sort == "combined":
-        filtered = filtered.copy()
-        filtered["_sort"] = health_weight * filtered["health_score"].fillna(0) + (1 - health_weight) * filtered["eco_score"].fillna(0)
-        filtered = filtered.sort_values("_sort", ascending=False)
-    elif sort == "health":
-        filtered = filtered.sort_values("health_score", ascending=False)
-    elif sort == "eco":
-        filtered = filtered.sort_values("eco_score", ascending=False)
-    elif sort == "name":
-        filtered = filtered.sort_values("product_name", ascending=True)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-    total = len(filtered)
-    start = (page - 1) * page_size
-    end = start + page_size
-
-    results = []
-    for _, row in filtered.iloc[start:end].iterrows():
-        results.append(make_product(row, health_weight))
-
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "results": results,
+    sort_map = {
+        "combined": f"({health_weight} * COALESCE(health_score, 0) + {1 - health_weight} * COALESCE(eco_score, 0)) DESC",
+        "health": "health_score DESC",
+        "eco": "eco_score DESC",
+        "name": "product_name ASC",
     }
+    order = sort_map.get(sort, sort_map["combined"])
+
+    total = conn.execute(f"SELECT COUNT(*) FROM products {where}", params).fetchone()[0]
+
+    offset = (page - 1) * page_size
+    rows = conn.execute(
+        f"SELECT * FROM products {where} ORDER BY {order} LIMIT ? OFFSET ?",
+        params + [page_size, offset],
+    ).fetchall()
+
+    results = [make_product(r, health_weight) for r in rows]
+    conn.close()
+
+    return {"total": total, "page": page, "page_size": page_size, "results": results}
 
 
 @app.get("/api/products/{code}", response_model=ProductDetailResponse)
 async def get_product(code: str):
-    product = df_products[df_products["code"].astype(str) == code]
-
-    if product.empty:
+    conn = get_db()
+    row = conn.execute("SELECT * FROM products WHERE code = ?", (code,)).fetchone()
+    conn.close()
+    if not row:
         raise HTTPException(status_code=404, detail="Product not found")
-
-    row = product.iloc[0]
-    row_idx = product.index[0]
-
-    return make_detail(row, row_idx)
+    return make_detail(row)
 
 
 @app.get("/api/products/{code}/alternatives", response_model=Dict[str, List[AlternativeResponse]])
 async def get_alternatives(code: str):
-    product = df_products[df_products["code"].astype(str) == code]
-
-    if product.empty:
+    conn = get_db()
+    cur = conn.execute("SELECT * FROM products WHERE code = ?", (code,)).fetchone()
+    if not cur:
+        conn.close()
         raise HTTPException(status_code=404, detail="Product not found")
 
-    row_idx = product.index[0]
-    product_vec = similarity_vectors[row_idx].reshape(1, -1)
+    row_idx = cur["row_idx"]
+    sims = cosine_similarities(row_idx)
 
-    similarities = cosine_similarity(product_vec, similarity_vectors)[0]
+    current_health = cur["health_score"] or 0
+    current_eco = cur["eco_score"] or 0
+    cur_sat = float(cur["saturated_fat_100g"] or 0)
+    cur_sugars = float(cur["sugars_100g"] or 0)
+    cur_protein = float(cur["proteins_100g"] or 0)
+    cur_nova = float(cur["nova_group"] or 0)
+    cur_packaging = cur["packaging"] or "—"
+    cur_labels = cur["labels"] or "—"
 
-    current_health = product.iloc[0]["health_score"] if pd.notna(product.iloc[0]["health_score"]) else 0
-    current_eco = product.iloc[0]["eco_score"] if pd.notna(product.iloc[0]["eco_score"]) else 0
-
-    health_better = df_products[df_products["health_score"] > current_health].copy()
-    health_better["_similarity"] = similarities[health_better.index]
-    health_better = health_better.nlargest(3, "_similarity")
-
-    eco_better = df_products[df_products["eco_score"] > current_eco].copy()
-    eco_better["_similarity"] = similarities[eco_better.index]
-    eco_better = eco_better.nlargest(3, "_similarity")
-
-    cur = product.iloc[0]
-    cur_sat = float(cur["saturated_fat_100g"]) if "saturated_fat_100g" in cur.index and pd.notna(cur["saturated_fat_100g"]) else 0
-    cur_sugars = float(cur["sugars_100g"]) if "sugars_100g" in cur.index and pd.notna(cur["sugars_100g"]) else 0
-    cur_protein = float(cur["proteins_100g"]) if "proteins_100g" in cur.index and pd.notna(cur["proteins_100g"]) else 0
-    cur_nova = float(cur["nova_group"]) if "nova_group" in cur.index and pd.notna(cur["nova_group"]) else 0
-    cur_packaging = safe_str(cur["packaging"]) if "packaging" in cur.index else "—"
-    cur_labels = safe_str(cur["labels"]) if "labels" in cur.index else "—"
+    health_rows = conn.execute(
+        "SELECT row_idx FROM products WHERE health_score > ?", (current_health,)
+    ).fetchall()
+    health_candidates = sorted(health_rows, key=lambda r: sims[r["row_idx"]], reverse=True)[:3]
+    health_top = [conn.execute("SELECT * FROM products WHERE row_idx = ?", (r["row_idx"],)).fetchone() for r in health_candidates]
 
     health_alts = []
-    for _, row in health_better.iterrows():
+    for row in health_top:
         diff = round(float(row["health_score"] - current_health), 1)
-        alt_sat = float(row["saturated_fat_100g"]) if "saturated_fat_100g" in row.index and pd.notna(row["saturated_fat_100g"]) else 0
-        alt_sugars = float(row["sugars_100g"]) if "sugars_100g" in row.index and pd.notna(row["sugars_100g"]) else 0
-        alt_protein = float(row["proteins_100g"]) if "proteins_100g" in row.index and pd.notna(row["proteins_100g"]) else 0
         health_alts.append(AlternativeResponse(
             product=make_product(row),
             explanation=f"This alternative has {diff:.1f} more health score with similar nutritional profile.",
             score_diff=diff,
             comparison={
-                "sat_fat_diff": round(cur_sat - alt_sat, 1),
-                "sugars_diff": round(cur_sugars - alt_sugars, 1),
-                "protein_diff": round(alt_protein - cur_protein, 1),
+                "sat_fat_diff": round(cur_sat - float(row["saturated_fat_100g"] or 0), 1),
+                "sugars_diff": round(cur_sugars - float(row["sugars_100g"] or 0), 1),
+                "protein_diff": round(float(row["proteins_100g"] or 0) - cur_protein, 1),
             },
         ))
 
+    eco_rows = conn.execute(
+        "SELECT row_idx FROM products WHERE eco_score > ?", (current_eco,)
+    ).fetchall()
+    eco_candidates = sorted(eco_rows, key=lambda r: sims[r["row_idx"]], reverse=True)[:3]
+    eco_top = [conn.execute("SELECT * FROM products WHERE row_idx = ?", (r["row_idx"],)).fetchone() for r in eco_candidates]
+
+    def eco_signed(row, col):
+        v = float(row[col] or 0)
+        return round((v - 0.5) * 80, 1)
+
+    cur_eco_pkg = eco_signed(cur, "eco_packaging")
+    cur_eco_proc = eco_signed(cur, "eco_processing")
+    cur_eco_lbl = eco_signed(cur, "eco_labels")
+    cur_eco_orig = eco_signed(cur, "eco_origins")
+
     eco_alts = []
-    for _, row in eco_better.iterrows():
+    for row in eco_top:
         diff = round(float(row["eco_score"] - current_eco), 1)
-        alt_nova = float(row["nova_group"]) if "nova_group" in row.index and pd.notna(row["nova_group"]) else 0
-        alt_packaging = safe_str(row["packaging"]) if "packaging" in row.index else "—"
-        alt_labels = safe_str(row["labels"]) if "labels" in row.index else "—"
         eco_alts.append(AlternativeResponse(
             product=make_product(row),
             explanation=f"This alternative has {diff:.1f} more eco score with similar nutritional profile.",
             score_diff=diff,
             comparison={
-                "packaging": alt_packaging,
+                "packaging": row["packaging"] or "—",
                 "packaging_was": cur_packaging,
-                "nova": alt_nova,
+                "nova": float(row["nova_group"] or 0),
                 "nova_was": cur_nova,
-                "labels": alt_labels,
+                "labels": row["labels"] or "—",
+                "origins": row["origins"] or "—",
+                "pkg_diff": round(eco_signed(row, "eco_packaging") - cur_eco_pkg, 1),
+                "proc_diff": round(eco_signed(row, "eco_processing") - cur_eco_proc, 1),
+                "lbl_diff": round(eco_signed(row, "eco_labels") - cur_eco_lbl, 1),
+                "orig_diff": round(eco_signed(row, "eco_origins") - cur_eco_orig, 1),
             },
         ))
 
-    return {
-        "better_for_you": health_alts,
-        "better_for_planet": eco_alts,
-    }
+    conn.close()
+    return {"better_for_you": health_alts, "better_for_planet": eco_alts}
 
 
 @app.get("/api/compare", response_model=CompareResponse)
 async def compare_products(codes: str = Query(...)):
+    conn = get_db()
     code_list = [c.strip() for c in codes.split(",")]
-
-    results = []
-    for code in code_list:
-        product = df_products[df_products["code"].astype(str) == code]
-        if not product.empty:
-            row = product.iloc[0]
-            row_idx = product.index[0]
-            results.append(make_detail(row, row_idx))
-
-    return CompareResponse(products=results)
+    placeholders = ",".join("?" for _ in code_list)
+    rows = conn.execute(f"SELECT * FROM products WHERE code IN ({placeholders})", code_list).fetchall()
+    conn.close()
+    return CompareResponse(products=[make_detail(r) for r in rows])
 
 
 @app.get("/api/categories", response_model=List[CategoryResponse])
 async def list_categories():
-    categories = {}
-
-    for cats_str in df_products["categories"].dropna():
-        for cat in cats_str.split(","):
-            cat = cat.strip()
-            categories[cat] = categories.get(cat, 0) + 1
-
-    sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)[:50]
-
-    return [CategoryResponse(name=name, count=count) for name, count in sorted_cats]
+    conn = get_db()
+    rows = conn.execute("SELECT name, count FROM categories ORDER BY count DESC").fetchall()
+    conn.close()
+    return [CategoryResponse(name=r["name"], count=r["count"]) for r in rows]
 
 
 @app.get("/api/stats", response_model=StatsResponse)
 async def get_stats():
-    total = len(df_products)
-
-    avg_health = round(float(df_products["health_score"].mean()), 2)
-    avg_eco = round(float(df_products["eco_score"].mean()), 2)
-    avg_combined = round(float(df_products["combined_score"].mean()), 2)
-
-    health_dist = df_products["health_grade"].value_counts().to_dict()
-    eco_dist = df_products["eco_grade"].value_counts().to_dict()
-    nutri_dist = df_products["nutriscore_grade"].value_counts().to_dict()
-
+    conn = get_db()
+    stats = {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM stats").fetchall()}
+    conn.close()
     return StatsResponse(
-        total_products=total,
-        avg_health_score=avg_health,
-        avg_eco_score=avg_eco,
-        avg_combined_score=avg_combined,
-        health_grade_distribution={str(k): int(v) for k, v in health_dist.items()},
-        eco_grade_distribution={str(k): int(v) for k, v in eco_dist.items()},
-        nutriscore_grade_distribution={str(k): int(v) for k, v in nutri_dist.items()},
+        total_products=int(stats["total_products"]),
+        avg_health_score=float(stats["avg_health_score"]),
+        avg_eco_score=float(stats["avg_eco_score"]),
+        avg_combined_score=float(stats["avg_combined_score"]),
+        health_grade_distribution=json.loads(stats["health_grade_distribution"]),
+        eco_grade_distribution=json.loads(stats["eco_grade_distribution"]),
+        nutriscore_grade_distribution=json.loads(stats["nutriscore_grade_distribution"]),
     )

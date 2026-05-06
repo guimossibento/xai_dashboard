@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { NSBadge, RadarChart, EcoBars, ProductImage } from '../components';
+import { NSBadge, RadarChart, EcoBars, EcoFactorCard, ProductImage } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -93,6 +93,58 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
         </div>
       </div>
 
+      <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, marginBottom: 12, borderTop: `2px solid ${T.eco}` }}>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.eco, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          Environmental impact · why this Eco-Score
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 16, marginTop: 12 }}>
+          <div>
+            <EcoBars items={product.feature_attributions?.eco_breakdown} />
+            <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '4px 0 0', lineHeight: 1.4 }}>
+              Positive = planet-friendly · Negative = higher impact · Scale −40 to +40
+            </p>
+          </div>
+          <div>
+            {(product.feature_attributions?.eco_breakdown || []).map(item => {
+              const descs = {
+                'Packaging': item.value >= 0
+                  ? `Packaging (${product.packaging || 'unknown'}) has relatively low environmental impact. Recyclable or minimal materials contribute positively.`
+                  : `Packaging (${product.packaging || 'unknown'}) contributes negatively. Non-recyclable or excessive packaging increases environmental footprint.`,
+                'Processing (NOVA)': item.value >= 0
+                  ? `NOVA group ${product.nova_group ? Math.round(product.nova_group) : '?'} indicates lower processing, which typically means less energy use in manufacturing.`
+                  : `NOVA group ${product.nova_group ? Math.round(product.nova_group) : '?'} indicates higher processing, meaning more energy and resources used in manufacturing.`,
+                'Eco labels': item.value >= 0
+                  ? `This product carries eco-certifications${product.labels ? ` (${product.labels.split(',').slice(0,2).join(', ').trim()})` : ''} that verify sustainable practices.`
+                  : `Limited or no eco-certifications detected. Products with labels like organic, fair trade, or rainforest alliance score higher here.`,
+                'Origin': item.value >= 0
+                  ? `Origin${product.origins ? ` (${product.origins})` : ''} contributes positively — shorter transport distance or sustainable sourcing region.`
+                  : `Origin${product.origins ? ` (${product.origins})` : ''} contributes negatively — longer transportation distances increase carbon footprint.`,
+              };
+              return <EcoFactorCard key={item.label} label={item.label} value={item.value} description={descs[item.label] || ''} />;
+            })}
+          </div>
+        </div>
+        {(product.packaging || product.origins || product.labels) && (
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14, paddingTop: 12, borderTop: `1px solid ${T.line}` }}>
+            {product.packaging && (
+              <span style={{ fontFamily: T.mono, fontSize: 10, padding: '3px 10px', borderRadius: 4, background: `${T.eco}12`, color: T.eco, border: `1px solid ${T.eco}30` }}>
+                📦 {product.packaging}
+              </span>
+            )}
+            {product.origins && (
+              <span style={{ fontFamily: T.mono, fontSize: 10, padding: '3px 10px', borderRadius: 4, background: `${T.eco}12`, color: T.eco, border: `1px solid ${T.eco}30` }}>
+                🌍 {product.origins}
+              </span>
+            )}
+            {product.labels && product.labels.split(',').slice(0, 4).map(l => (
+              <span key={l} style={{ fontFamily: T.mono, fontSize: 10, padding: '3px 10px', borderRadius: 4, background: `${T.eco}12`, color: T.eco, border: `1px solid ${T.eco}30` }}>
+                🏷 {l.trim()}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
           <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
@@ -106,12 +158,7 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
           </p>
         </div>
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 14 }}>
-            Eco contributions · signed
-          </div>
-          <EcoBars items={product.feature_attributions?.eco_breakdown} />
-
-          <div style={{ marginTop: 24, fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
             Nutrition per 100g
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
@@ -167,9 +214,18 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
                         </>
                       ) : (
                         <>
-                          <div>packaging · <span style={{ color: T.text }}>{alt.comparison.packaging}</span> (was {alt.comparison.packaging_was})</div>
-                          <div>NOVA · <span style={{ color: alt.comparison.nova < alt.comparison.nova_was ? T.eco : T.warn }}>{Math.round(alt.comparison.nova)}</span> (was {Math.round(alt.comparison.nova_was)})</div>
-                          <div>labels · <span style={{ color: T.text }}>{alt.comparison.labels || '—'}</span></div>
+                          <div>packaging · <span style={{ color: T.text }}>{alt.comparison.packaging}</span> (was {alt.comparison.packaging_was})
+                            {alt.comparison.pkg_diff !== 0 && <span style={{ color: alt.comparison.pkg_diff > 0 ? T.eco : '#E63E11', marginLeft: 6 }}>{alt.comparison.pkg_diff > 0 ? '+' : ''}{alt.comparison.pkg_diff}</span>}
+                          </div>
+                          <div>processing · NOVA <span style={{ color: alt.comparison.nova < alt.comparison.nova_was ? T.eco : '#E63E11' }}>{Math.round(alt.comparison.nova)}</span> (was {Math.round(alt.comparison.nova_was)})
+                            {alt.comparison.proc_diff !== 0 && <span style={{ color: alt.comparison.proc_diff > 0 ? T.eco : '#E63E11', marginLeft: 6 }}>{alt.comparison.proc_diff > 0 ? '+' : ''}{alt.comparison.proc_diff}</span>}
+                          </div>
+                          <div>eco labels · <span style={{ color: T.text }}>{alt.comparison.labels || '—'}</span>
+                            {alt.comparison.lbl_diff !== 0 && <span style={{ color: alt.comparison.lbl_diff > 0 ? T.eco : '#E63E11', marginLeft: 6 }}>{alt.comparison.lbl_diff > 0 ? '+' : ''}{alt.comparison.lbl_diff}</span>}
+                          </div>
+                          <div>origin · <span style={{ color: T.text }}>{alt.comparison.origins || '—'}</span>
+                            {alt.comparison.orig_diff !== 0 && <span style={{ color: alt.comparison.orig_diff > 0 ? T.eco : '#E63E11', marginLeft: 6 }}>{alt.comparison.orig_diff > 0 ? '+' : ''}{alt.comparison.orig_diff}</span>}
+                          </div>
                         </>
                       )}
                     </div>
