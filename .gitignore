@@ -6,4 +6,3 @@ dist/
 .vite/
 *.egg-info/
 .DS_Store
-backend/products.db

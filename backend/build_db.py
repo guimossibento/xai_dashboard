@@ -1,10 +1,12 @@
 import pandas as pd
+import numpy as np
 import sqlite3
 import json
 from pathlib import Path
 
 ML_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "ml_output"
 DB_PATH = Path(__file__).resolve().parent / "products.db"
+SIM_PATH = Path(__file__).resolve().parent / "sim_vectors.npy"
 
 USECOLS = [
     "code", "product_name", "brands", "categories", "nutriscore_grade",
@@ -18,11 +20,14 @@ USECOLS = [
 
 PCT_COLS = ["fat_100g", "saturated_fat_100g", "sugars_100g", "salt_100g", "fiber_100g", "proteins_100g"]
 
+REQUIRED_NUTRI = ["energy_kcal_100g", "fat_100g", "saturated_fat_100g", "sugars_100g", "salt_100g", "fiber_100g", "proteins_100g"]
+
 
 def build():
     print(f"ML_OUTPUT_PATH: {ML_OUTPUT_PATH}")
     print(f"DB_PATH: {DB_PATH}")
     print(f"CSV exists: {(ML_OUTPUT_PATH / 'products_scored.csv').exists()}")
+
     df = pd.read_csv(
         ML_OUTPUT_PATH / "products_scored.csv",
         dtype={"code": str},
@@ -30,8 +35,28 @@ def build():
         low_memory=False,
     )
     df["code"] = df["code"].astype(str)
-    df["row_idx"] = range(len(df))
 
+    original_indices = np.arange(len(df))
+
+    mask = (
+        df["health_score"].notna() & (df["health_score"] > 0) &
+        df["eco_score"].notna() & (df["eco_score"] > 0) &
+        df["product_name"].notna() & (df["product_name"] != "")
+    )
+    for col in REQUIRED_NUTRI:
+        mask &= df[col].notna()
+
+    kept_indices = original_indices[mask.values]
+    df = df[mask].reset_index(drop=True)
+    print(f"Filtered: {len(df)} products with complete data (from {len(original_indices)})")
+
+    sim_full = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy")
+    sim_filtered = sim_full[kept_indices].astype(np.float32)
+    np.save(str(SIM_PATH), sim_filtered)
+    print(f"Similarity vectors: {sim_filtered.shape} -> {SIM_PATH.stat().st_size / 1024 / 1024:.1f} MB")
+    del sim_full, sim_filtered
+
+    df["row_idx"] = range(len(df))
     for col in PCT_COLS:
         df[f"pct_{col}"] = df[col].rank(pct=True).fillna(0.5).round(4)
 

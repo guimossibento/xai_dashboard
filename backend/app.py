@@ -92,16 +92,17 @@ def get_db():
     return conn
 
 
+SIM_PATH = Path(__file__).resolve().parent / "sim_vectors.npy"
+
+
 @app.on_event("startup")
 async def startup():
     global similarity_vectors, similarity_norms
-    if not DB_PATH.exists():
-        print(f"products.db not found at {DB_PATH}, building...")
-        import subprocess
-        subprocess.run(["python", str(Path(__file__).resolve().parent / "build_db.py")], check=True)
-    print(f"DB exists: {DB_PATH.exists()}, size: {DB_PATH.stat().st_size / 1024 / 1024:.1f} MB")
-    similarity_vectors = np.load(ML_OUTPUT_PATH / "similarity_vectors.npy").astype(np.float32)
+    print(f"DB exists: {DB_PATH.exists()}")
+    print(f"SIM exists: {SIM_PATH.exists()}")
+    similarity_vectors = np.load(str(SIM_PATH)).astype(np.float32)
     similarity_norms = np.linalg.norm(similarity_vectors, axis=1)
+    print(f"Loaded {similarity_vectors.shape[0]} similarity vectors")
 
 
 def sf(v):
