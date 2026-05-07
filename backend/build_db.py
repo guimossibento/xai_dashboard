@@ -56,6 +56,20 @@ def build():
     print(f"Similarity vectors: {sim_filtered.shape} -> {SIM_PATH.stat().st_size / 1024 / 1024:.1f} MB")
     del sim_full, sim_filtered
 
+    carbon_path = ML_OUTPUT_PATH / "carbon_data.csv"
+    if carbon_path.exists():
+        carbon = pd.read_csv(carbon_path, dtype={"code": str})
+        carbon["code"] = carbon["code"].astype(str)
+        before = len(df)
+        df = df.merge(carbon, on="code", how="left")
+        has_co2 = df["co2_total"].notna().sum()
+        print(f"Carbon data merged: {has_co2}/{len(df)} products have CO2 values")
+    else:
+        print("No carbon_data.csv found, skipping carbon columns")
+        for col in ["co2_agriculture", "co2_processing", "co2_packaging", "co2_transportation", "co2_distribution", "co2_consumption", "co2_total",
+                     "ef_agriculture", "ef_processing", "ef_packaging", "ef_transportation", "ef_distribution", "ef_consumption", "ef_total"]:
+            df[col] = None
+
     df["row_idx"] = range(len(df))
     for col in PCT_COLS:
         df[f"pct_{col}"] = df[col].rank(pct=True).fillna(0.5).round(4)

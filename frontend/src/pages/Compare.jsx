@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { NSBadge, RadarChart, EcoBarsOverlay } from '../components';
+import { NSBadge, RadarChart, EcoBarsOverlay, EcoRadar, LeafGauge } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -193,6 +193,49 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
               <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '8px 0 0', lineHeight: 1.4 }}>
                 Positive = planet-friendly · Negative = higher impact
               </p>
+            </div>
+
+            <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
+              <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+                Overlaid eco radar
+              </div>
+              {products[0]?.feature_attributions?.eco_breakdown && (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0' }}>
+                  <EcoRadar
+                    data={products[0].feature_attributions.eco_breakdown}
+                    size={260}
+                    color={COLORS[0]}
+                    overlays={products.slice(1).filter(p => p.feature_attributions?.eco_breakdown).map((p, i) => ({
+                      data: p.feature_attributions.eco_breakdown,
+                      color: COLORS[i + 1],
+                    }))}
+                  />
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {products.map((p, i) => (
+                  <div key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontFamily: T.mono, color: T.text }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[i], flexShrink: 0 }} />
+                    {p.product_name}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
+              <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+                Eco vitality
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+                {products.map((p, i) => (
+                  <div key={p.code} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <LeafGauge score={p.eco_score || 0} grade={p.eco_grade} size={80} />
+                    <span style={{ fontFamily: T.mono, fontSize: 9, color: COLORS[i], maxWidth: 80, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.product_name}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>

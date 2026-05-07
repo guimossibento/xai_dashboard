@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { NSBadge, RadarChart, EcoBars, EcoFactorCard, ProductImage } from '../components';
+import { NSBadge, RadarChart, EcoBars, EcoFactorCard, EcoRadar, LeafGauge, EcoPipeline, ProductImage } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -97,11 +97,25 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
         <div style={{ fontFamily: T.mono, fontSize: 10, color: T.eco, letterSpacing: 1.2, textTransform: 'uppercase' }}>
           Environmental impact · why this Eco-Score
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 16, marginTop: 12 }}>
+
+        <div style={{ marginTop: 14, marginBottom: 16 }}>
+          <EcoPipeline
+            breakdown={product.feature_attributions?.eco_breakdown}
+            packaging={product.packaging}
+            nova={product.nova_group}
+            labels={product.labels}
+            origins={product.origins}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : 'auto 1fr 1fr', gap: 16, marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <LeafGauge score={ecoScore} grade={product.eco_grade} size={narrow ? 100 : 110} />
+          </div>
           <div>
-            <EcoBars items={product.feature_attributions?.eco_breakdown} />
-            <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '4px 0 0', lineHeight: 1.4 }}>
-              Positive = planet-friendly · Negative = higher impact · Scale −40 to +40
+            <EcoRadar data={product.feature_attributions?.eco_breakdown} size={220} />
+            <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '4px 0 0', lineHeight: 1.4, textAlign: 'center' }}>
+              Center = high impact · Edge = planet-friendly
             </p>
           </div>
           <div>
