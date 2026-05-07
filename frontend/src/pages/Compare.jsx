@@ -39,14 +39,35 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
     const bestHealth = [...products].sort((a, b) => (b.health_score || 0) - (a.health_score || 0))[0];
     const bestEco = [...products].sort((a, b) => (b.eco_score || 0) - (a.eco_score || 0))[0];
     const bestProtein = [...products].sort((a, b) => (b.proteins_100g || 0) - (a.proteins_100g || 0))[0];
+    const lowestNova = [...products].filter(p => p.nova_group).sort((a, b) => a.nova_group - b.nova_group)[0];
+    const withLabels = products.filter(p => p.labels);
+    const withoutLabels = products.filter(p => !p.labels);
+    const novaLabels = { 1: 'unprocessed', 2: 'processed ingredients', 3: 'processed', 4: 'ultra-processed' };
+
     return (
-      <div style={{ marginTop: 16, padding: '12px 14px', background: T.panel2, borderRadius: 8 }}>
+      <div style={{ padding: '12px 14px', background: T.panel2, borderRadius: 8 }}>
         <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>Summary</div>
         <p style={{ fontSize: 12, color: T.text, lineHeight: 1.6, margin: 0 }}>
           <strong>{bestHealth.product_name}</strong> is the <span style={{ color: T.health }}>healthiest</span> by Nutri-Score.{' '}
           <strong>{bestEco.product_name}</strong> is the <span style={{ color: T.eco }}>most planet-friendly</span> by Eco-Score.{' '}
           <strong>{bestProtein.product_name}</strong> leads on protein density ({(bestProtein.proteins_100g || 0).toFixed(0)}g/100g).
         </p>
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.line}` }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.eco, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Eco highlights</div>
+          <p style={{ fontSize: 11, color: T.text, lineHeight: 1.6, margin: 0 }}>
+            {lowestNova && <>
+              <strong>{lowestNova.product_name}</strong> has the least processing (NOVA {Math.round(lowestNova.nova_group)}, {novaLabels[Math.round(lowestNova.nova_group)] || '?'}).{' '}
+            </>}
+            {withLabels.length > 0 && <>
+              {withLabels.length === products.length ? 'All products carry eco-certifications.' :
+                <>{withLabels.map(p => <strong key={p.code}>{p.product_name}</strong>).reduce((a, b, i) => i === 0 ? [b] : [...a, ', ', b], [])} {withLabels.length === 1 ? 'carries' : 'carry'} eco-certifications.{' '}</>
+              }
+            </>}
+            {withoutLabels.length > 0 && <>
+              <span style={{ color: '#E63E11' }}>{withoutLabels.map(p => p.product_name).join(', ')}</span> {withoutLabels.length === 1 ? 'lacks' : 'lack'} eco-certifications, which penalizes {withoutLabels.length === 1 ? 'its' : 'their'} Labels score.
+            </>}
+          </p>
+        </div>
       </div>
     );
   };
@@ -172,6 +193,44 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
               <p style={{ fontSize: 10, color: T.muted, fontFamily: T.mono, margin: '8px 0 0', lineHeight: 1.4 }}>
                 Positive = planet-friendly · Negative = higher impact
               </p>
+            </div>
+
+            <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
+              <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 10 }}>
+                Eco factor guide
+              </div>
+              {[
+                { dim: 'Packaging', icon: '📦', explain: (ps) => {
+                  const types = [...new Set(ps.map(p => p.packaging).filter(Boolean))];
+                  return types.length ? `Materials found: ${types.join(', ')}. Recyclable or minimal packaging scores positive; excessive or non-recyclable packaging scores negative.` : 'No packaging data available. Missing data defaults to a neutral score.';
+                }},
+                { dim: 'Processing', icon: '⚙️', explain: (ps) => {
+                  const novas = ps.map(p => ({ name: p.product_name, nova: p.nova_group ? Math.round(p.nova_group) : null })).filter(p => p.nova);
+                  const labels = { 1: 'unprocessed', 2: 'processed ingredients', 3: 'processed', 4: 'ultra-processed' };
+                  return novas.map(p => `${p.name}: NOVA ${p.nova} (${labels[p.nova] || '?'})`).join('. ') + '. Lower NOVA = less energy in manufacturing = positive score.';
+                }},
+                { dim: 'Labels', icon: '🏷', explain: (ps) => {
+                  const withLabels = ps.filter(p => p.labels);
+                  const without = ps.filter(p => !p.labels);
+                  let text = '';
+                  if (withLabels.length) text += withLabels.map(p => `${p.product_name}: ${p.labels.split(',').slice(0,3).join(', ')}`).join('. ') + '. ';
+                  if (without.length) text += `${without.map(p => p.product_name).join(', ')}: no eco-certifications — scores negative because absence of labels (e.g. Organic, Fair Trade) is penalized.`;
+                  return text || 'No label data.';
+                }},
+                { dim: 'Origin', icon: '🌍', explain: (ps) => {
+                  const origins = ps.map(p => ({ name: p.product_name, origin: p.origins })).filter(p => p.origin);
+                  const noOrigin = ps.filter(p => !p.origins);
+                  let text = '';
+                  if (origins.length) text += origins.map(p => `${p.name}: ${p.origin}`).join('. ') + '. Local or low-transport origins score positive. ';
+                  if (noOrigin.length) text += `${noOrigin.map(p => p.product_name).join(', ')}: origin unknown — defaults to neutral.`;
+                  return text || 'No origin data.';
+                }},
+              ].map(({ dim, icon, explain }) => (
+                <div key={dim} style={{ padding: '8px 0', borderBottom: `1px solid ${T.line}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 3 }}>{icon} {dim}</div>
+                  <p style={{ fontSize: 11, color: T.muted, lineHeight: 1.5, margin: 0 }}>{explain(products)}</p>
+                </div>
+              ))}
             </div>
 
             {summary() && (
