@@ -123,7 +123,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
               const descs = {
                 'Packaging': item.value >= 0
                   ? `Packaging (${product.packaging || 'unknown'}) has relatively low environmental impact. Recyclable or minimal materials contribute positively.`
-                  : `Packaging (${product.packaging || 'unknown'}) contributes negatively. Non-recyclable or excessive packaging increases environmental footprint.`,
+                  : (!product.packaging)
+                    ? `Packaging data is missing — penalized because without packaging information, recyclability and material impact cannot be assessed.`
+                    : `Packaging (${product.packaging}) contributes negatively. Non-recyclable or excessive packaging increases environmental footprint.`,
                 'Processing (NOVA)': item.value >= 0
                   ? `NOVA group ${product.nova_group ? Math.round(product.nova_group) : '?'} indicates lower processing, which typically means less energy use in manufacturing.`
                   : `NOVA group ${product.nova_group ? Math.round(product.nova_group) : '?'} indicates higher processing, meaning more energy and resources used in manufacturing.`,
@@ -132,7 +134,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
                   : `Limited or no eco-certifications detected. Products with labels like organic, fair trade, or rainforest alliance score higher here.`,
                 'Origin': item.value >= 0
                   ? `Origin${product.origins ? ` (${product.origins})` : ''} contributes positively — shorter transport distance or sustainable sourcing region.`
-                  : `Origin${product.origins ? ` (${product.origins})` : ''} contributes negatively — longer transportation distances increase carbon footprint.`,
+                  : (!product.origins || product.origins.toLowerCase() === 'unspecified')
+                    ? `Origin is unknown or unspecified — penalized because without origin data, transport distance and sourcing sustainability cannot be verified.`
+                    : `Origin (${product.origins}) contributes negatively — longer transportation distances increase carbon footprint.`,
               };
               return <EcoFactorCard key={item.label} label={item.label} value={item.value} description={descs[item.label] || ''} />;
             })}

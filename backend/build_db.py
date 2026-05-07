@@ -70,6 +70,16 @@ def build():
                      "ef_agriculture", "ef_processing", "ef_packaging", "ef_transportation", "ef_distribution", "ef_consumption", "ef_total"]:
             df[col] = None
 
+    unknown = df["origins"].fillna("").str.lower().str.strip().isin(["", "unspecified", "unknown"])
+    df.loc[unknown, "eco_origins"] = 0.2
+    pkg_missing = df["packaging"].fillna("").str.lower().str.strip().isin(["", "unspecified", "unknown"])
+    df.loc[pkg_missing, "eco_packaging"] = 0.15
+    print(f"Penalized eco_origins: {unknown.sum()} products, eco_packaging: {pkg_missing.sum()} products")
+
+    eco_dims = ["eco_packaging", "eco_processing", "eco_labels", "eco_origins"]
+    df["eco_score"] = (df[eco_dims].mean(axis=1) * 100).clip(0, 100).round(2)
+    df["eco_grade"] = pd.cut(df["eco_score"], bins=[-1, 20, 40, 60, 80, 101], labels=["e", "d", "c", "b", "a"])
+
     df["row_idx"] = range(len(df))
     for col in PCT_COLS:
         df[f"pct_{col}"] = df[col].rank(pct=True).fillna(0.5).round(4)

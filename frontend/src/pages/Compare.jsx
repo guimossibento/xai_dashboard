@@ -261,11 +261,11 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
                   return text || 'No label data.';
                 }},
                 { dim: 'Origin', icon: '🌍', explain: (ps) => {
-                  const origins = ps.map(p => ({ name: p.product_name, origin: p.origins })).filter(p => p.origin);
-                  const noOrigin = ps.filter(p => !p.origins);
+                  const known = ps.filter(p => p.origins && !['unspecified', 'unknown'].includes(p.origins.toLowerCase()));
+                  const noOrigin = ps.filter(p => !p.origins || ['unspecified', 'unknown'].includes(p.origins.toLowerCase()));
                   let text = '';
-                  if (origins.length) text += origins.map(p => `${p.name}: ${p.origin}`).join('. ') + '. Local or low-transport origins score positive. ';
-                  if (noOrigin.length) text += `${noOrigin.map(p => p.product_name).join(', ')}: origin unknown — defaults to neutral.`;
+                  if (known.length) text += known.map(p => `${p.product_name}: ${p.origins}`).join('. ') + '. Local or low-transport origins score positive. ';
+                  if (noOrigin.length) text += `${noOrigin.map(p => p.product_name).join(', ')}: origin unknown — penalized because transport distance and sourcing sustainability cannot be verified.`;
                   return text || 'No origin data.';
                 }},
               ].map(({ dim, icon, explain }) => (
