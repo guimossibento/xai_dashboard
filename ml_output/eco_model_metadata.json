@@ -1,0 +1,93 @@
+{
+  "eco_model": "GradientBoostingRegressor",
+  "eco_model_params": {
+    "n_estimators": 300,
+    "max_depth": 5,
+    "learning_rate": 0.1,
+    "subsample": 0.8
+  },
+  "eco_cv_r2": 0.9999,
+  "eco_cv_r2_std": 0.0001,
+  "eco_train_r2": 1.0,
+  "eco_features": [
+    "f_pkg_score",
+    "f_pkg_has_plastic",
+    "f_pkg_has_glass",
+    "f_pkg_has_cardboard",
+    "f_pkg_has_metal",
+    "f_pkg_missing",
+    "f_nova",
+    "f_nova_missing",
+    "f_eco_labels_count",
+    "f_diet_labels_count",
+    "f_quality_labels_count",
+    "f_has_organic",
+    "f_has_fairtrade",
+    "f_has_fsc",
+    "f_labels_missing",
+    "f_total_labels",
+    "f_origin_score",
+    "f_origin_missing",
+    "f_origin_local",
+    "f_origin_eu"
+  ],
+  "eco_feature_groups": {
+    "packaging": [
+      "f_pkg_score",
+      "f_pkg_has_plastic",
+      "f_pkg_has_glass",
+      "f_pkg_has_cardboard",
+      "f_pkg_has_metal",
+      "f_pkg_missing"
+    ],
+    "processing": [
+      "f_nova",
+      "f_nova_missing"
+    ],
+    "labels": [
+      "f_eco_labels_count",
+      "f_diet_labels_count",
+      "f_quality_labels_count",
+      "f_has_organic",
+      "f_has_fairtrade",
+      "f_has_fsc",
+      "f_labels_missing",
+      "f_total_labels"
+    ],
+    "origins": [
+      "f_origin_score",
+      "f_origin_missing",
+      "f_origin_local",
+      "f_origin_eu"
+    ]
+  },
+  "eco_group_importances": {
+    "packaging": 0.0044,
+    "processing": 0.8608,
+    "labels": 0.1306,
+    "origins": 0.0043
+  },
+  "eco_dimension_weights": {
+    "packaging": 0.0044,
+    "processing": 0.8607,
+    "labels": 0.1306,
+    "origins": 0.0043
+  },
+  "eco_feature_importances": {
+    "f_pkg_score": 0.0042,
+    "f_nova": 0.731,
+    "f_nova_missing": 0.1298,
+    "f_eco_labels_count": 0.0205,
+    "f_diet_labels_count": 0.0022,
+    "f_has_organic": 0.0525,
+    "f_labels_missing": 0.0333,
+    "f_total_labels": 0.0207,
+    "f_origin_score": 0.0041
+  },
+  "eco_dimension_means": {
+    "eco_packaging": 0.3298,
+    "eco_processing": 0.4744,
+    "eco_labels": 0.201,
+    "eco_origins": 0.2379
+  }
+}

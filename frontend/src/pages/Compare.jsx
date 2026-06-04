@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { api } from '../api';
-import { NSBadge, RadarChart, EcoBarsOverlay, EcoRadar, LeafGauge } from '../components';
+import { NSBadge, RadarChart, EcoBarsOverlay, EcoRadar, LeafGauge, PriceBadge, TasteTags, AnimalWelfareBadge } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -8,22 +8,26 @@ const COLORS = [T.health, T.eco, '#9b6bcc', T.warn];
 
 export default function Compare({ weight, compareCodes = [], toggleCompare }) {
   const narrow = useNarrow();
-  const [products, setProducts] = useState([]);
+  const [fetched, setFetched] = useState([]);
   const [searchQ, setSearchQ] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [error, setError] = useState(null);
+  const codesKey = compareCodes.join(',');
 
   useEffect(() => {
-    if (!compareCodes.length) { setProducts([]); return; }
-    api.compare(compareCodes).then(d => setProducts(d.products));
-  }, [compareCodes.join(',')]);
+    if (!codesKey) return;
+    api.compare(codesKey.split(',')).then(d => { setFetched(d.products); setError(null); }).catch(() => setError('Failed to load comparison data'));
+  }, [codesKey]);
 
   useEffect(() => {
-    if (!searchQ || searchQ.length < 2) { setSearchResults([]); return; }
+    if (searchQ.length < 2) return;
     const t = setTimeout(() => {
-      api.products({ q: searchQ, page_size: 5 }).then(d => setSearchResults(d.results));
+      api.products({ q: searchQ, page_size: 5 }).then(d => setSearchResults(d.results)).catch(() => {});
     }, 300);
     return () => clearTimeout(t);
   }, [searchQ]);
+
+  const products = compareCodes.map(c => fetched.find(p => p.code === c)).filter(Boolean);
 
   const addProduct = (code) => {
     toggleCompare(code);
@@ -72,16 +76,18 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
     );
   };
 
+  if (error) return <div style={{ padding: 40, color: T.warn, fontFamily: T.mono, fontSize: 13 }}>{error}</div>;
+
   return (
     <div style={{ padding: narrow ? '16px' : '20px 28px 40px', flex: 1 }}>
       <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.5 }}>BENCH / {products.length} SUBJECTS</div>
       <h1 style={{ fontSize: 24, fontWeight: 700, margin: '4px 0 18px', color: T.text }}>Side-by-side comparison</h1>
 
-      <div style={{ marginBottom: 16, position: 'relative' }}>
-        <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Add a product to compare..."
+      <form onSubmit={e => e.preventDefault()} style={{ marginBottom: 16, position: 'relative' }}>
+        <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Add a product to compare..." aria-label="Search products to compare"
           style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: `1px solid ${T.line}`, background: T.panel,
             fontSize: 13, fontFamily: T.sans, color: T.text, outline: 'none', boxSizing: 'border-box' }} />
-        {searchResults.length > 0 && (
+        {searchQ.length >= 2 && searchResults.length > 0 && (
           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: T.panel, border: `1px solid ${T.line}`,
             borderRadius: 8, marginTop: 4, zIndex: 10, boxShadow: '0 10px 30px rgba(28,28,25,.12)' }}>
             {searchResults.map(p => {
@@ -100,7 +106,7 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
             })}
           </div>
         )}
-      </div>
+      </form>
 
       {products.length === 0 && (
         <div style={{ padding: 40, textAlign: 'center', color: T.muted, fontFamily: T.mono, fontSize: 12 }}>
@@ -118,7 +124,7 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
                 <div key={p.code}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 8, height: 8, borderRadius: 2, background: COLORS[i] }} />
-                    <button onClick={() => removeProduct(p.code)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 10 }}>×</button>
+                    <button aria-label={`Remove ${p.product_name} from compare`} onClick={() => removeProduct(p.code)} style={{ background: 'none', border: 'none', color: T.muted, cursor: 'pointer', fontSize: 10 }}>×</button>
                   </div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: T.text, lineHeight: 1.2, marginTop: 4 }}>{p.product_name}</div>
                   <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, marginTop: 3 }}>{p.brands}</div>
@@ -139,6 +145,9 @@ export default function Compare({ weight, compareCodes = [], toggleCompare }) {
               { l: 'packaging', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{p.packaging || '-'}</span> },
               { l: 'origin', render: p => <span style={{ fontFamily: T.mono, fontSize: 12, color: T.text }}>{p.origins || '-'}</span> },
               { l: 'eco labels', render: p => <span style={{ fontFamily: T.mono, fontSize: 11, color: T.text, wordBreak: 'break-word' }}>{p.labels?.split(',').slice(0,2).join(', ') || '-'}</span> },
+              { l: 'est. price', render: p => <PriceBadge tier={p.price_tier} price={p.estimated_price} /> },
+              { l: 'taste', render: p => <TasteTags tags={p.taste_tags} /> },
+              { l: 'animal welfare', render: p => <AnimalWelfareBadge score={p.animal_welfare_score} labels={p.animal_welfare_labels} /> },
             ].map(row => (
               <div key={row.l} style={{ display: 'grid', gridTemplateColumns: `1fr repeat(${products.length}, 1fr)`, gap: 8,
                 padding: '8px 0', borderBottom: `1px solid ${T.line}`, alignItems: 'center' }}>

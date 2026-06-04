@@ -6,3 +6,11 @@ dist/
 .vite/
 *.egg-info/
 .DS_Store
+
+# course materials / IDE / templates / scratch (not app source)
+.idea/
+/01_discover.png
+/*.pdf
+/IEEE-Transactions-LaTeX2e-templates-and-instructions/
+/IEEE-Transactions-LaTeX2e-templates-and-instructions.zip
+# large regenerable build artifacts (rebuild via build_db.py / ml_pipeline.py)

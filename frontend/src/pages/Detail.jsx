@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api';
-import { NSBadge, RadarChart, EcoBars, EcoFactorCard, EcoRadar, LeafGauge, EcoPipeline, ProductImage } from '../components';
+import { NSBadge, RadarChart, EcoFactorCard, EcoRadar, LeafGauge, EcoPipeline, FeatureImportancePanel, ProductImage, PriceBadge, AnimalWelfareBadge, TasteTags, InfoTooltip } from '../components';
 import { T } from '../theme';
 import { useNarrow } from '../useNarrow';
 
@@ -11,15 +11,19 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
   const narrow = useNarrow();
   const [product, setProduct] = useState(null);
   const [alts, setAlts] = useState(null);
+  const [modelInfo, setModelInfo] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    api.product(code).then(setProduct);
-    api.alternatives(code).then(setAlts);
+    api.product(code).then(d => { setProduct(d); setError(null); }).catch(() => setError('Failed to load product details'));
+    api.alternatives(code).then(setAlts).catch(() => {});
+    api.modelInfo().then(setModelInfo).catch(() => {});
   }, [code]);
 
   const productCode = product?.code || code;
   const inCompare = compareCodes.includes(productCode);
 
+  if (error) return <div style={{ padding: 40, color: T.warn, fontFamily: T.mono, fontSize: 13 }}>{error}</div>;
   if (!product) return <div style={{ padding: 40, color: T.muted }}>Loading...</div>;
 
   const combined = Math.round(weight * product.eco_score + (1 - weight) * product.health_score);
@@ -34,8 +38,14 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
       <div style={{ display: 'flex', flexDirection: narrow ? 'column' : 'row', alignItems: narrow ? 'flex-start' : 'center', gap: narrow ? 4 : 16, margin: '4px 0 16px' }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0, color: T.text }}>{product.product_name}</h1>
         <div style={{ fontFamily: T.mono, fontSize: 12, color: T.muted }}>{product.brands} · {product.categories?.split(',').pop().trim()}</div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <PriceBadge tier={product.price_tier} price={product.estimated_price} />
+          <InfoTooltip text="Estimated price based on product category and brand tier (budget/standard/premium). Actual retail prices may vary by store and region." />
+          <AnimalWelfareBadge score={product.animal_welfare_score} labels={product.animal_welfare_labels} />
+          <TasteTags tags={product.taste_tags} />
+        </div>
         <div style={{ flex: narrow ? undefined : 1 }} />
-        <button onClick={() => toggleCompare(productCode)}
+        <button aria-label={inCompare ? 'Remove from compare' : 'Add to compare'} onClick={() => toggleCompare(productCode)}
           style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8,
             border: `1px solid ${inCompare ? T.eco : T.line}`, background: inCompare ? `${T.eco}14` : T.panel,
             color: inCompare ? T.eco : T.muted, fontSize: 12, fontFamily: T.mono, fontWeight: 600,
@@ -46,7 +56,7 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '280px 1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
-          <ProductImage url={product.image_url} height={180} rounded={6} categories={product.categories} />
+          <ProductImage url={product.image_url} height={180} rounded={6} categories={product.categories} name={product.product_name} />
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 12 }}>
             {[product.nova_group && `NOVA ${Math.round(product.nova_group)}`, product.packaging, product.origins,
               ...(product.labels ? product.labels.split(',').slice(0, 3) : [])].filter(Boolean).map(t => (
@@ -58,7 +68,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
         </div>
 
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase' }}>Scores</div>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', display: 'flex', alignItems: 'center' }}>
+            Scores
+          </div>
           <div style={{ display: 'flex', gap: 14, marginTop: 12 }}>
             {[
               { k: 'Health', v: healthScore, g: product.health_grade, c: T.health },
@@ -94,8 +106,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
       </div>
 
       <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, marginBottom: 12, borderTop: `2px solid ${T.eco}` }}>
-        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.eco, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+        <div style={{ fontFamily: T.mono, fontSize: 10, color: T.eco, letterSpacing: 1.2, textTransform: 'uppercase', display: 'flex', alignItems: 'center' }}>
           Environmental impact · why this Eco-Score
+          <InfoTooltip text="The Eco-Score evaluates environmental impact using lifecycle assessment data including carbon footprint, water use, and biodiversity impact. Methodology by ADEME and INRAE (2021)." />
         </div>
 
         <div style={{ marginTop: 14, marginBottom: 16 }}>
@@ -161,12 +174,16 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
             ))}
           </div>
         )}
+        <div style={{ marginTop: 14 }}>
+          <FeatureImportancePanel modelInfo={modelInfo?.eco} kind="eco" />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', display: 'flex', alignItems: 'center' }}>
             Nutritional radar · why this Nutri-Score
+            <InfoTooltip text="Nutri-Score is a front-of-pack nutrition label developed by Santé publique France. It grades products A (best) to E (worst) based on energy, sugars, saturated fat, sodium, fiber, protein, and fruit/vegetable content (Julia & Hercberg, 2017)." />
           </div>
           <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
             <RadarChart data={product.feature_attributions?.radar} size={260} color={T.health} />
@@ -176,8 +193,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
           </p>
         </div>
         <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14 }}>
-          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
             Nutrition per 100g
+            <InfoTooltip text="NOVA classifies foods by degree of processing: Group 1 (unprocessed), Group 2 (processed culinary ingredients), Group 3 (processed foods), Group 4 (ultra-processed). Monteiro et al., Food Science and Nutrition, 2019." />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4 }}>
             {[
@@ -196,6 +214,9 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
               </div>
             ))}
           </div>
+          <div style={{ marginTop: 12 }}>
+            <FeatureImportancePanel modelInfo={modelInfo?.health} kind="health" />
+          </div>
         </div>
       </div>
 
@@ -212,7 +233,7 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
                   <div onClick={() => nav(`/product/${alt.product.code}`)}
                     style={{ display: 'flex', gap: 12, marginTop: 10, cursor: 'pointer' }}>
                     <div style={{ width: 70, flexShrink: 0 }}>
-                      <ProductImage url={alt.product.image_url} height={70} rounded={6} categories={alt.product.categories} />
+                      <ProductImage url={alt.product.image_url} height={70} rounded={6} categories={alt.product.categories} name={alt.product.product_name} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{alt.product.product_name}</div>
@@ -255,6 +276,63 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {alts && alts.cheaper?.length > 0 && (
+        <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, marginTop: 12, borderTop: '2px solid #287D3C' }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: '#287D3C', letterSpacing: 1.2, textTransform: 'uppercase' }}>Cheaper alternative</div>
+          {alts.cheaper.slice(0, 1).map(alt => (
+            <div key={alt.product.code}>
+              <div onClick={() => nav(`/product/${alt.product.code}`)}
+                style={{ display: 'flex', gap: 12, marginTop: 10, cursor: 'pointer' }}>
+                <div style={{ width: 70, flexShrink: 0 }}>
+                  <ProductImage url={alt.product.image_url} height={70} rounded={6} categories={alt.product.categories} name={alt.product.product_name} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: T.text }}>{alt.product.product_name}</div>
+                  <div style={{ fontFamily: T.mono, fontSize: 11, color: T.muted, marginTop: 4 }}>{alt.product.brands}</div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <PriceBadge tier={alt.product.price_tier} price={alt.product.estimated_price} />
+                    <NSBadge grade={alt.product.health_grade} size="sm" />
+                  </div>
+                </div>
+              </div>
+              {alt.comparison && (
+                <div style={{ marginTop: 12, fontFamily: T.mono, fontSize: 11, color: T.muted, lineHeight: 1.7 }}>
+                  <div>price · <span style={{ color: '#287D3C' }}>€{alt.comparison.estimated_price?.toFixed(2)}</span> (was €{alt.comparison.estimated_price_was?.toFixed(2)}) — <span style={{ color: '#287D3C', fontWeight: 700 }}>save €{alt.comparison.saving?.toFixed(2)}</span></div>
+                  <div>health · <span style={{ color: alt.comparison.health_diff >= 0 ? T.eco : T.warn }}>{alt.comparison.health_diff >= 0 ? '+' : ''}{alt.comparison.health_diff?.toFixed(1)}</span></div>
+                  <div>eco · <span style={{ color: alt.comparison.eco_diff >= 0 ? T.eco : T.warn }}>{alt.comparison.eco_diff >= 0 ? '+' : ''}{alt.comparison.eco_diff?.toFixed(1)}</span></div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {alts && alts.better_for_you?.[0] && (
+        <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, padding: 14, marginTop: 12, borderTop: `2px solid ${T.warn}` }}>
+          <div style={{ fontFamily: T.mono, fontSize: 10, color: T.warn, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            What-If Simulation · 30 servings/month
+          </div>
+          <p style={{ fontSize: 11, color: T.muted, margin: '8px 0 12px', lineHeight: 1.5 }}>
+            If you replaced <strong style={{ color: T.text }}>{product.product_name}</strong> with <strong style={{ color: T.text }}>{alts.better_for_you[0].product.product_name}</strong> for 30 servings/month (100g each):
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
+            {[
+              { l: 'Sat. fat saved', v: ((alts.better_for_you[0].comparison?.sat_fat_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Sugar saved', v: ((alts.better_for_you[0].comparison?.sugars_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Extra protein', v: ((alts.better_for_you[0].comparison?.protein_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Health Δ/month', v: (alts.better_for_you[0].score_diff * 30), u: 'pts', good: true },
+            ].map(item => (
+              <div key={item.l} style={{ padding: 10, background: T.panel2, borderRadius: 8 }}>
+                <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>{item.l}</div>
+                <div style={{ fontFamily: T.mono, fontSize: 18, fontWeight: 700, color: item.v > 0 ? T.eco : item.v < 0 ? T.warn : T.muted, marginTop: 4 }}>
+                  {item.v > 0 ? '+' : ''}{item.v.toFixed(0)}{item.u}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

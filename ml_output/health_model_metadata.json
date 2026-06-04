@@ -1,0 +1,56 @@
+{
+  "health_model": "GradientBoostingRegressor",
+  "health_model_params": {
+    "n_estimators": 200,
+    "max_depth": 4,
+    "learning_rate": 0.1,
+    "subsample": 0.8
+  },
+  "health_cv_r2": 0.9946,
+  "health_cv_r2_std": 0.0002,
+  "health_train_r2": 0.9958,
+  "health_features": [
+    "energy_kcal_100g",
+    "fat_100g",
+    "saturated_fat_100g",
+    "sugars_100g",
+    "salt_100g",
+    "fiber_100g",
+    "proteins_100g"
+  ],
+  "health_feature_labels": {
+    "energy_kcal_100g": "Energy (kcal)",
+    "fat_100g": "Fat",
+    "saturated_fat_100g": "Saturated fat",
+    "sugars_100g": "Sugars",
+    "salt_100g": "Salt",
+    "fiber_100g": "Fiber",
+    "proteins_100g": "Proteins"
+  },
+  "health_feature_groups": {
+    "negative_nutrients": [
+      "energy_kcal_100g",
+      "fat_100g",
+      "saturated_fat_100g",
+      "sugars_100g",
+      "salt_100g"
+    ],
+    "positive_nutrients": [
+      "fiber_100g",
+      "proteins_100g"
+    ]
+  },
+  "health_group_importances": {
+    "negative_nutrients": 0.8417,
+    "positive_nutrients": 0.1583
+  },
+  "health_feature_importances": {
+    "energy_kcal_100g": 0.0548,
+    "fat_100g": 0.2669,
+    "saturated_fat_100g": 0.3432,
+    "sugars_100g": 0.1404,
+    "salt_100g": 0.0364,
+    "fiber_100g": 0.0493,
+    "proteins_100g": 0.1091
+  }
+}

@@ -6,6 +6,15 @@ import {
 import { T } from './theme';
 
 const NUTRI_COLORS = { a: '#287D3C', b: '#85BB2F', c: '#C8960C', d: '#EE8100', e: '#E63E11' };
+const PRICE_COLORS = { 1: '#287D3C', 2: '#C8960C', 3: '#E63E11' };
+const PRICE_LABELS = { 1: '€', 2: '€€', 3: '€€€' };
+const TASTE_COLORS = {
+  Earthy: '#6D4C41', Nutty: '#8D6E63', Roasted: '#4E342E', Smoky: '#5D4037',
+  Herbal: '#558B2F', Tangy: '#F9A825', Citrusy: '#F57F17', Sweet: '#E91E63',
+  Rich: '#6A1B9A', Fresh: '#00897B', Fruity: '#7CB342', Spicy: '#D32F2F',
+  Briny: '#0277BD', Savory: '#FF6F00', Mild: '#78909C', Creamy: '#AB47BC',
+  Bitter: '#4E342E',
+};
 
 const CAT_GRADIENTS = {
   dairy: 'linear-gradient(135deg, #d4c89a 0%, #c4b87a 100%)',
@@ -35,6 +44,106 @@ function getCatLabel(categories) {
 
 function getCatGradient(label) {
   return CAT_GRADIENTS[label.toLowerCase()] || CAT_GRADIENTS.default;
+}
+
+export function PriceBadge({ tier, price }) {
+  if (!tier && !price) return null;
+  const color = PRICE_COLORS[tier] || PRICE_COLORS[2];
+  const label = price ? `€${Number(price).toFixed(2)}` : (PRICE_LABELS[tier] || '€€');
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', padding: '2px 8px', borderRadius: 999,
+      background: `${color}14`, border: `1px solid ${color}40`,
+      fontFamily: T.mono, fontSize: 11, fontWeight: 700, color, whiteSpace: 'nowrap',
+    }}>{label}</span>
+  );
+}
+
+export function AnimalWelfareBadge({ score, labels }) {
+  if (score === null || score === undefined) return null;
+  if (score === -1) return (
+    <span title="Plant-based or non-animal product" style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999,
+      background: '#287D3C14', border: '1px solid #287D3C40', whiteSpace: 'nowrap',
+    }}>
+      <span style={{ fontSize: 12 }}>🌱</span>
+      <span style={{ fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: '#287D3C' }}>Plant</span>
+    </span>
+  );
+  if (score === 0) return (
+    <span title="Conventional animal product — no welfare certifications found" style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999,
+      background: '#9E9E9E14', border: '1px solid #9E9E9E40', whiteSpace: 'nowrap',
+    }}>
+      <span style={{ fontSize: 12 }}>🐾</span>
+      <span style={{ fontFamily: T.mono, fontSize: 10, fontWeight: 600, color: '#9E9E9E' }}>Standard</span>
+    </span>
+  );
+  const levels = { 1: 'Basic', 2: 'Good', 3: 'High' };
+  const colors = { 1: '#C8960C', 2: '#85BB2F', 3: '#287D3C' };
+  const color = colors[score] || colors[1];
+  return (
+    <span title={labels || ''} style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999,
+      background: `${color}14`, border: `1px solid ${color}40`, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ fontSize: 12 }}>🐾</span>
+      <span style={{ fontFamily: T.mono, fontSize: 10, fontWeight: 600, color }}>{levels[score]}</span>
+    </span>
+  );
+}
+
+export function TasteTags({ tags }) {
+  if (!tags) return null;
+  const list = tags.split(',').filter(Boolean);
+  if (!list.length) return null;
+  return (
+    <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
+      {list.map(tag => (
+        <span key={tag} style={{
+          padding: '1px 7px', borderRadius: 999, fontSize: 9, fontFamily: T.mono, fontWeight: 600,
+          background: `${TASTE_COLORS[tag] || '#666'}18`, color: TASTE_COLORS[tag] || '#666',
+          border: `1px solid ${TASTE_COLORS[tag] || '#666'}30`,
+        }}>{tag}</span>
+      ))}
+    </span>
+  );
+}
+
+export function InfoTooltip({ text }) {
+  const [show, setShow] = useState(false);
+  const [style, setStyle] = useState({});
+  const open = (el) => {
+    setShow(true);
+    const rect = el.getBoundingClientRect();
+    const tipW = 260;
+    let left = rect.left + rect.width / 2 - tipW / 2;
+    if (left < 8) left = 8;
+    if (left + tipW > window.innerWidth - 8) left = window.innerWidth - tipW - 8;
+    const above = rect.top > 200;
+    setStyle({
+      position: 'fixed',
+      left,
+      [above ? 'bottom' : 'top']: above ? window.innerHeight - rect.top + 6 : rect.bottom + 6,
+      width: tipW,
+    });
+  };
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 4 }}>
+      <span role="button" tabIndex={0} aria-label={text}
+        onMouseEnter={e => open(e.currentTarget)} onMouseLeave={() => setShow(false)}
+        onFocus={e => open(e.currentTarget)} onBlur={() => setShow(false)}
+        style={{ width: 14, height: 14, borderRadius: '50%', background: `${T.muted}20`, color: T.muted,
+          fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help' }}>ⓘ</span>
+      {show && (
+        <span role="tooltip" style={{
+          ...style, padding: '8px 10px', borderRadius: 6, background: T.panel, border: `1px solid ${T.line}`,
+          boxShadow: '0 4px 16px rgba(0,0,0,.12)', fontSize: 10, fontFamily: T.sans, color: T.text,
+          lineHeight: 1.5, zIndex: 9999, pointerEvents: 'none',
+        }}>{text}</span>
+      )}
+    </span>
+  );
 }
 
 export function NSBadge({ grade, kind = 'nutri', size = 'md' }) {
@@ -91,7 +200,7 @@ export function PrioritySlider({ value, onChange }) {
 
 export function RadarChart({ data, size = 260, color = '#378ADD', overlays = [] }) {
   if (!data) return null;
-  const LABELS = { fat: 'Low kcal', saturated_fat: 'Low sat. fat', sugars: 'Low sugar', salt: 'Low salt', fiber: 'Fiber', proteins: 'Protein' };
+  const LABELS = { fat: 'Low fat', saturated_fat: 'Low sat. fat', sugars: 'Low sugar', salt: 'Low salt', fiber: 'Fiber', proteins: 'Protein' };
   const keys = Object.keys(data);
   const chartData = keys.map(k => ({ axis: LABELS[k] || k.replace('_', ' '), main: data[k] || 0,
     ...overlays.reduce((acc, ov, i) => ({ ...acc, [`ov${i}`]: ov.data?.[k] || 0 }), {}),
@@ -144,8 +253,7 @@ export function EcoBars({ items }) {
 export function EcoBarsOverlay({ products, colors }) {
   if (!products?.length) return null;
   const dims = ['Packaging', 'Processing', 'Labels', 'Origin'];
-  const dimKeys = ['eco_packaging', 'eco_processing', 'eco_labels', 'eco_origins'];
-  const data = dims.map((dim, di) => {
+  const data = dims.map((dim) => {
     const entry = { name: dim };
     products.forEach((p, pi) => {
       const raw = p.feature_attributions?.eco_breakdown?.find(b =>
@@ -179,7 +287,7 @@ export function EcoBarsOverlay({ products, colors }) {
 
 export function EcoFactorCard({ label, value, description }) {
   const positive = value >= 0;
-  const icon = positive ? '●' : '●';
+  const icon = positive ? '▲' : '▼';
   return (
     <div style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: `1px solid ${T.line}` }}>
       <div style={{ width: 28, height: 28, borderRadius: 6, background: positive ? `${T.eco}18` : '#E63E1118',
@@ -327,18 +435,125 @@ export function EcoPipeline({ breakdown, packaging, nova, labels, origins }) {
   );
 }
 
-export function ProductImage({ url, height = 100, rounded = 6, categories }) {
+const IMPORTANCE_CONFIGS = {
+  eco: {
+    groupLabels: {
+      processing: { icon: '🏭', name: 'Processing (NOVA)' },
+      labels: { icon: '🏷', name: 'Eco Labels' },
+      packaging: { icon: '📦', name: 'Packaging' },
+      origins: { icon: '🌍', name: 'Origin' },
+    },
+    featLabels: {
+      f_nova: 'NOVA group', f_nova_missing: 'NOVA missing', f_pkg_score: 'Packaging recyclability',
+      f_pkg_has_plastic: 'Has plastic', f_pkg_has_glass: 'Has glass', f_pkg_has_cardboard: 'Has cardboard',
+      f_pkg_has_metal: 'Has metal', f_pkg_missing: 'Packaging missing',
+      f_eco_labels_count: 'Eco-cert count', f_diet_labels_count: 'Diet labels', f_quality_labels_count: 'Quality labels',
+      f_has_organic: 'Organic', f_has_fairtrade: 'Fair Trade', f_has_fsc: 'FSC certified',
+      f_labels_missing: 'Labels missing', f_total_labels: 'Total labels',
+      f_origin_score: 'Proximity score', f_origin_missing: 'Origin missing', f_origin_local: 'Local (Spain)', f_origin_eu: 'EU origin',
+    },
+    groupColors: { processing: '#E67E22', labels: '#27AE60', packaging: '#3498DB', origins: '#9B59B6' },
+    groupsKey: 'eco_group_importances', featsKey: 'eco_feature_importances', groupDefsKey: 'eco_feature_groups', r2Key: 'eco_cv_r2',
+    fallbackColor: T.eco,
+  },
+  health: {
+    groupLabels: {
+      negative_nutrients: { icon: '⚠️', name: 'To limit' },
+      positive_nutrients: { icon: '✅', name: 'Beneficial' },
+    },
+    featLabels: {
+      energy_kcal_100g: 'Energy (kcal)', fat_100g: 'Fat', saturated_fat_100g: 'Saturated fat',
+      sugars_100g: 'Sugars', salt_100g: 'Salt', fiber_100g: 'Fiber', proteins_100g: 'Proteins',
+    },
+    groupColors: { negative_nutrients: '#E74C3C', positive_nutrients: '#27AE60' },
+    groupsKey: 'health_group_importances', featsKey: 'health_feature_importances', groupDefsKey: 'health_feature_groups', r2Key: 'health_cv_r2',
+    fallbackColor: T.health,
+  },
+};
+
+export function FeatureImportancePanel({ modelInfo, kind = 'eco' }) {
+  const [expanded, setExpanded] = useState(null);
+  if (!modelInfo) return null;
+  const cfg = IMPORTANCE_CONFIGS[kind];
+  const groups = modelInfo[cfg.groupsKey] || {};
+  const featureImps = modelInfo[cfg.featsKey] || {};
+  const featureGroups = modelInfo[cfg.groupDefsKey] || {};
+  const sorted = Object.entries(groups).sort((a, b) => b[1] - a[1]);
+  const maxVal = Math.max(...sorted.map(([, v]) => v));
+
+  return (
+    <div style={{ background: T.panel2, borderRadius: 8, padding: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+          Model Feature Importance
+        </span>
+        <InfoTooltip text="Feature importance is computed using a Gradient Boosted Regression model (Friedman, 2001). The bars show how much each factor contributes to the model's predictions. CV R² indicates cross-validated predictive accuracy." />
+        <span style={{ fontFamily: T.mono, fontSize: 9, color: T.muted }}>
+          GBR · CV R²={modelInfo[cfg.r2Key]?.toFixed(2)}
+        </span>
+      </div>
+      {sorted.map(([group, imp]) => {
+        const pct = (imp * 100).toFixed(1);
+        const barW = `${(imp / maxVal) * 100}%`;
+        const color = cfg.groupColors[group] || cfg.fallbackColor;
+        const meta = cfg.groupLabels[group] || { icon: '?', name: group };
+        const isOpen = expanded === group;
+        const groupFeats = (featureGroups[group] || [])
+          .filter(f => (featureImps[f] || 0) > 0)
+          .sort((a, b) => (featureImps[b] || 0) - (featureImps[a] || 0));
+        return (
+          <div key={group} style={{ marginBottom: 6 }}>
+            <div onClick={() => setExpanded(isOpen ? null : group)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '3px 0' }}
+              role="button" tabIndex={0} aria-expanded={isOpen} aria-label={`${meta.name} importance ${pct}%`}>
+              <span style={{ fontSize: 14, width: 20, textAlign: 'center' }}>{meta.icon}</span>
+              <span style={{ fontFamily: T.mono, fontSize: 11, color: T.text, width: 120, flexShrink: 0 }}>{meta.name}</span>
+              <div style={{ flex: 1, height: 16, background: T.panel, borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ width: barW, height: '100%', background: `${color}cc`, borderRadius: 4,
+                  transition: 'width 0.6s ease' }} />
+              </div>
+              <span style={{ fontFamily: T.mono, fontSize: 11, color, fontWeight: 600, width: 48, textAlign: 'right' }}>{pct}%</span>
+              <span style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, width: 12 }}>{isOpen ? '▾' : '▸'}</span>
+            </div>
+            {isOpen && groupFeats.length > 0 && (
+              <div style={{ marginLeft: 26, marginTop: 4, marginBottom: 4, paddingLeft: 10, borderLeft: `2px solid ${color}30` }}>
+                {groupFeats.map(f => {
+                  const fImp = featureImps[f] || 0;
+                  const fPct = (fImp * 100).toFixed(1);
+                  const fBar = `${(fImp / maxVal) * 100}%`;
+                  return (
+                    <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 0' }}>
+                      <span style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, width: 120, flexShrink: 0 }}>
+                        {cfg.featLabels[f] || f}
+                      </span>
+                      <div style={{ flex: 1, height: 10, background: T.panel, borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: fBar, height: '100%', background: `${color}80`, borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontFamily: T.mono, fontSize: 10, color: T.muted, width: 40, textAlign: 'right' }}>{fPct}%</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ProductImage({ url, height = 100, rounded = 6, categories, name = '' }) {
   const [err, setErr] = useState(false);
   if (!url || err) {
     const label = getCatLabel(categories);
     return (
-      <div style={{ width: '100%', height, borderRadius: rounded, background: getCatGradient(label),
+      <div role="img" aria-label={name || label} style={{ width: '100%', height, borderRadius: rounded, background: getCatGradient(label),
         display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <span style={{ fontFamily: T.mono, fontSize: 10, color: '#fff', letterSpacing: 1.2, textTransform: 'uppercase',
           textShadow: '0 1px 3px rgba(0,0,0,.15)', fontWeight: 600 }}>{label}</span>
       </div>
     );
   }
-  return <img src={url} alt="" onError={() => setErr(true)}
+  return <img src={url} alt={name || 'Product image'} onError={() => setErr(true)}
     style={{ width: '100%', height, objectFit: 'contain', borderRadius: rounded, background: T.panel2 }} />;
 }

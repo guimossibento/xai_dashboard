@@ -17,4 +17,5 @@ export const api = {
   compare: (codes) => fetchJSON('/api/compare', { codes: codes.join(',') }),
   categories: () => fetchJSON('/api/categories'),
   stats: () => fetchJSON('/api/stats'),
+  modelInfo: () => fetchJSON('/api/model-info'),
 };

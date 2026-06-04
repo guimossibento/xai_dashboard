@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { PrioritySlider } from './components';
 import { useNarrow } from './useNarrow';
+import { api } from './api';
 import { T } from './theme';
 import Landing from './pages/Landing';
 import Results from './pages/Results';
@@ -14,33 +15,19 @@ const NAV = [
   { path: '/compare', label: 'Compare', icon: '⇄' },
 ];
 
-function Layout() {
-  const [weight, setWeight] = useState(0.5);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [query, setQuery] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [compareCodes, setCompareCodes] = useState([]);
-  const narrow = useNarrow();
-
-  const toggleCompare = (code) => {
-    setCompareCodes(prev =>
-      prev.includes(code) ? prev.filter(c => c !== code) : prev.length < 4 ? [...prev, code] : prev
-    );
-  };
-
-  const compareProps = { compareCodes, toggleCompare };
-
-  const Logo = () => (
+function Logo() {
+  return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <div style={{ width: 26, height: 26, borderRadius: 6, background: 'linear-gradient(135deg, #1D9E75, #378ADD)' }} />
       <div style={{ fontWeight: 800, fontSize: 14, color: T.text, letterSpacing: -0.3 }}>GreenFind</div>
       <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1 }}>PRO</div>
     </div>
   );
+}
 
-  const NavItem = ({ n }) => (
-    <NavLink key={n.path} to={n.path} end={n.path === '/'} onClick={() => setMenuOpen(false)}
+function NavItem({ n, onClose, compareCount }) {
+  return (
+    <NavLink to={n.path} end={n.path === '/'} onClick={onClose}
       style={({ isActive }) => ({
         display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 6,
         border: 'none', background: isActive ? T.panel2 : 'transparent',
@@ -49,14 +36,42 @@ function Layout() {
       })}>
       <span style={{ fontFamily: T.mono, fontSize: 13 }}>{n.icon}</span>
       {n.label}
-      {n.path === '/compare' && compareCodes.length > 0 && (
+      {n.path === '/compare' && compareCount > 0 && (
         <span style={{ marginLeft: 'auto', background: T.eco, color: '#fff', borderRadius: 10,
           padding: '1px 6px', fontSize: 10, fontFamily: T.mono, fontWeight: 700 }}>
-          {compareCodes.length}
+          {compareCount}
         </span>
       )}
     </NavLink>
   );
+}
+
+function Layout() {
+  const [weight, setWeight] = useState(0.5);
+  const navigate = useNavigate();
+  const [query, setQuery] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [compareCodes, setCompareCodes] = useState(() => {
+    try { return JSON.parse(sessionStorage.getItem('greenfind_compare') || '[]'); } catch { return []; }
+  });
+  const [total, setTotal] = useState(null);
+  const narrow = useNarrow();
+
+  useEffect(() => { api.stats().then(s => setTotal(s.total_products)).catch(() => {}); }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem('greenfind_compare', JSON.stringify(compareCodes)); } catch { /* ignore */ }
+  }, [compareCodes]);
+
+  const goSearch = () => navigate(`/results?q=${encodeURIComponent(query)}`);
+
+  const toggleCompare = (code) => {
+    setCompareCodes(prev =>
+      prev.includes(code) ? prev.filter(c => c !== code) : prev.length < 4 ? [...prev, code] : prev
+    );
+  };
+
+  const compareProps = { compareCodes, toggleCompare };
+  const closeMenu = () => setMenuOpen(false);
 
   const routes = (
     <Routes>
@@ -81,7 +96,7 @@ function Layout() {
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8,
             background: T.panel2, border: `1px solid ${T.line}`, borderRadius: 8, padding: '6px 10px' }}>
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="search…"
-              onKeyDown={e => { if (e.key === 'Enter') { navigate(`/results?q=${query}`); setMenuOpen(false); } }}
+              onKeyDown={e => { if (e.key === 'Enter') { goSearch(); setMenuOpen(false); } }}
               style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
                 color: T.text, fontSize: 13, fontFamily: T.sans }} />
           </div>
@@ -91,7 +106,7 @@ function Layout() {
           <div style={{ position: 'absolute', top: 58, left: 8, right: 8, zIndex: 10,
             background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10,
             padding: 12, boxShadow: '0 10px 30px rgba(28,28,25,.12)' }}>
-            {NAV.map(n => <NavItem key={n.path} n={n} />)}
+            {NAV.map(n => <NavItem key={n.path} n={n} onClose={closeMenu} compareCount={compareCodes.length} />)}
             <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${T.line}`,
               fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
               Priority mix
@@ -114,7 +129,7 @@ function Layout() {
         <div style={{ marginBottom: 24 }}><Logo /></div>
 
         <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Workspace</div>
-        {NAV.map(n => <NavItem key={n.path} n={n} />)}
+        {NAV.map(n => <NavItem key={n.path} n={n} onClose={closeMenu} compareCount={compareCodes.length} />)}
 
         <div style={{ marginTop: 24, fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 8 }}>
           Priority mix
@@ -124,14 +139,14 @@ function Layout() {
         <div style={{ marginTop: 20 }}>
           <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 6 }}>Quick search</div>
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="search…"
-            onKeyDown={e => e.key === 'Enter' && navigate(`/results?q=${query}`)}
+            onKeyDown={e => { if (e.key === 'Enter') goSearch(); }}
             style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: `1px solid ${T.line}`, background: T.panel2,
               fontSize: 11, fontFamily: T.sans, color: T.text, outline: 'none', boxSizing: 'border-box' }} />
         </div>
 
         <div style={{ flex: 1 }} />
         <div style={{ padding: '10px 12px', background: T.panel2, borderRadius: 8, fontFamily: T.mono, fontSize: 10, color: T.muted, lineHeight: 1.6 }}>
-          <div>DATASET · 84,645</div>
+          <div>DATASET · {total ? total.toLocaleString() : '—'}</div>
           <div>SCHEMA · OFF v2</div>
           <div style={{ color: T.eco }}>● live</div>
         </div>
