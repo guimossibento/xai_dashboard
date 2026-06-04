@@ -320,10 +320,10 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: narrow ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 8 }}>
             {[
-              { l: 'Sat. fat saved', v: ((alts.better_for_you[0].comparison?.sat_fat_diff || 0) * 30), u: 'g', good: true },
-              { l: 'Sugar saved', v: ((alts.better_for_you[0].comparison?.sugars_diff || 0) * 30), u: 'g', good: true },
-              { l: 'Extra protein', v: ((alts.better_for_you[0].comparison?.protein_diff || 0) * 30), u: 'g', good: true },
-              { l: 'Health Δ/month', v: (alts.better_for_you[0].score_diff * 30), u: 'pts', good: true },
+              { l: 'Sat. fat saved/mo', v: ((alts.better_for_you[0].comparison?.sat_fat_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Sugar saved/mo', v: ((alts.better_for_you[0].comparison?.sugars_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Protein Δ/mo', v: ((alts.better_for_you[0].comparison?.protein_diff || 0) * 30), u: 'g', good: true },
+              { l: 'Health score Δ', v: (alts.better_for_you[0].score_diff), u: ' pts', good: true },
             ].map(item => (
               <div key={item.l} style={{ padding: 10, background: T.panel2, borderRadius: 8 }}>
                 <div style={{ fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>{item.l}</div>

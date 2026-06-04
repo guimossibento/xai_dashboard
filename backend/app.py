@@ -24,6 +24,7 @@ ML_OUTPUT_PATH = Path(__file__).resolve().parent.parent / "ml_output"
 
 ECO_MIDPOINT = 0.5
 ECO_SCALE = 80
+MIN_SCORE_GAIN = 10
 
 similarity_vectors = None
 similarity_norms = None
@@ -346,7 +347,7 @@ async def get_alternatives(code: str):
         cur_packaging = cur["packaging"] or "—"
 
         health_rows = conn.execute(
-            "SELECT row_idx FROM products WHERE health_score > ?", (current_health,)
+            "SELECT row_idx FROM products WHERE health_score >= ?", (current_health + MIN_SCORE_GAIN,)
         ).fetchall()
         health_candidates = sorted(health_rows, key=lambda r: sims[r["row_idx"]], reverse=True)[:3]
         health_idxs = [r["row_idx"] for r in health_candidates]
@@ -376,7 +377,7 @@ async def get_alternatives(code: str):
             ))
 
         eco_rows = conn.execute(
-            "SELECT row_idx FROM products WHERE eco_score > ?", (current_eco,)
+            "SELECT row_idx FROM products WHERE eco_score >= ?", (current_eco + MIN_SCORE_GAIN,)
         ).fetchall()
         eco_candidates = sorted(eco_rows, key=lambda r: sims[r["row_idx"]], reverse=True)[:3]
         eco_idxs = [r["row_idx"] for r in eco_candidates]
