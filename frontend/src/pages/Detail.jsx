@@ -13,6 +13,7 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
   const [alts, setAlts] = useState(null);
   const [modelInfo, setModelInfo] = useState(null);
   const [error, setError] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   useEffect(() => {
     api.product(code).then(d => { setProduct(d); setError(null); }).catch(() => setError('Failed to load product details'));
@@ -174,9 +175,6 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
             ))}
           </div>
         )}
-        <div style={{ marginTop: 14 }}>
-          <FeatureImportancePanel modelInfo={modelInfo?.eco} kind="eco" />
-        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
@@ -214,10 +212,24 @@ export default function Detail({ weight, compareCodes = [], toggleCompare }) {
               </div>
             ))}
           </div>
-          <div style={{ marginTop: 12 }}>
+        </div>
+      </div>
+
+      <div style={{ background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10, marginBottom: 12, overflow: 'hidden' }}>
+        <button onClick={() => setShowAdvanced(!showAdvanced)} style={{
+          width: '100%', padding: '10px 14px', border: 'none', background: 'none', cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          fontFamily: T.mono, fontSize: 10, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase',
+        }}>
+          <span>🔬 Advanced metrics · model feature importance</span>
+          <span style={{ fontSize: 14, transition: 'transform 0.2s', transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+        </button>
+        {showAdvanced && (
+          <div style={{ padding: '0 14px 14px', display: 'grid', gridTemplateColumns: narrow ? '1fr' : '1fr 1fr', gap: 12 }}>
+            <FeatureImportancePanel modelInfo={modelInfo?.eco} kind="eco" />
             <FeatureImportancePanel modelInfo={modelInfo?.health} kind="health" />
           </div>
-        </div>
+        )}
       </div>
 
       {alts && (
