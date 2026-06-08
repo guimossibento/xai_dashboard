@@ -105,7 +105,7 @@ function Layout() {
         {menuOpen && (
           <>
           <div onClick={closeMenu} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
-          <div style={{ position: 'absolute', top: 58, left: 8, right: 8, zIndex: 10,
+          <div style={{ position: 'fixed', top: 58, left: 8, right: 8, zIndex: 10,
             background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10,
             padding: 12, boxShadow: '0 10px 30px rgba(28,28,25,.12)' }}>
             {NAV.map(n => <NavItem key={n.path} n={n} onClose={closeMenu} compareCount={compareCodes.length} />)}
