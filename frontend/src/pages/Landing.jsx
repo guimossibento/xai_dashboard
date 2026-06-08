@@ -67,13 +67,13 @@ export default function Landing({ weight }) {
             Top picks · sorted by combined score
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '30px 1.5fr 70px 70px 40px 50px' : '40px 50px 1.5fr 1fr 80px 80px 50px 70px', gap: 10, padding: '8px 14px',
+        <div style={{ display: 'grid', gridTemplateColumns: narrow ? '28px 1fr 52px 52px 42px' : '40px 50px 1.5fr 1fr 80px 80px 50px 70px', gap: narrow ? 6 : 10, padding: '8px 14px',
           fontFamily: T.mono, fontSize: 9, color: T.muted, letterSpacing: 1.2, textTransform: 'uppercase', borderBottom: `1px solid ${T.line}`, background: T.panel2 }}>
-          <div>#</div>{!narrow && <div></div>}<div>Product</div>{!narrow && <div>Brand</div>}<div>Nutri</div><div>Eco</div><div>Price</div><div>Score</div>
+          <div>#</div>{!narrow && <div></div>}<div>Product</div>{!narrow && <div>Brand</div>}<div>Nutri</div><div>Eco</div>{!narrow && <div>Price</div>}<div>Score</div>
         </div>
         {products.map((p, i) => (
           <div key={p.code} onClick={() => nav(`/product/${p.code}`)}
-            style={{ display: 'grid', gridTemplateColumns: narrow ? '30px 1.5fr 70px 70px 40px 50px' : '40px 50px 1.5fr 1fr 80px 80px 50px 70px', gap: 10, padding: '10px 14px',
+            style={{ display: 'grid', gridTemplateColumns: narrow ? '28px 1fr 52px 52px 42px' : '40px 50px 1.5fr 1fr 80px 80px 50px 70px', gap: narrow ? 6 : 10, padding: '10px 14px',
               alignItems: 'center', borderBottom: `1px solid ${T.line}`, cursor: 'pointer' }}
             onMouseEnter={e => e.currentTarget.style.background = T.panel2}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -83,8 +83,8 @@ export default function Landing({ weight }) {
             {!narrow && <div style={{ fontSize: 11, color: T.muted, fontFamily: T.mono, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.brands}</div>}
             <NSBadge grade={p.health_grade} size="sm" />
             <NSBadge grade={p.eco_grade} size="sm" kind="eco" />
-            <PriceBadge tier={p.price_tier} price={p.estimated_price} />
-            <div style={{ fontFamily: T.mono, fontSize: 16, fontWeight: 700, color: combined(p) >= 70 ? T.eco : combined(p) >= 50 ? T.health : T.warn }}>
+            {!narrow && <PriceBadge tier={p.price_tier} price={p.estimated_price} />}
+            <div style={{ fontFamily: T.mono, fontSize: narrow ? 14 : 16, fontWeight: 700, color: combined(p) >= 70 ? T.eco : combined(p) >= 50 ? T.health : T.warn }}>
               {combined(p)}
             </div>
           </div>

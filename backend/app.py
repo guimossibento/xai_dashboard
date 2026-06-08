@@ -488,3 +488,4 @@ async def get_model_info():
 @app.get("/api/references")
 async def get_references():
     return SCIENTIFIC_REFERENCES
+

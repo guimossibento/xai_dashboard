@@ -103,6 +103,8 @@ function Layout() {
         </div>
 
         {menuOpen && (
+          <>
+          <div onClick={closeMenu} style={{ position: 'fixed', inset: 0, zIndex: 9 }} />
           <div style={{ position: 'absolute', top: 58, left: 8, right: 8, zIndex: 10,
             background: T.panel, border: `1px solid ${T.line}`, borderRadius: 10,
             padding: 12, boxShadow: '0 10px 30px rgba(28,28,25,.12)' }}>
@@ -113,6 +115,7 @@ function Layout() {
             </div>
             <PrioritySlider value={weight} onChange={setWeight} />
           </div>
+          </>
         )}
 
         <main style={{ minWidth: 0 }}>{routes}</main>
